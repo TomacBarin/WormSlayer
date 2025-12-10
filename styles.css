@@ -66,6 +66,8 @@
 h1 {
     color: var(--able-gray-50);
     font-size: var(--spacing-24);
+    /* display: flex;
+    flex-wrap: nowrap; */
 
 }
 
@@ -75,11 +77,12 @@ h1 {
     display: flex;
     justify-content: right;
     width: var(--spacing-128);
-    margin-top: var(--spacing-3);
+    margin-top: var(--spacing-1);
     margin-bottom: var(--spacing-1);
 }
 
 #infoBtn {
+    /* color: var(--able-gray-20); */
     color: var(--able-gray-20);
     background-color: var(--able-gray-50);
     height: var(--spacing-3);
@@ -123,7 +126,7 @@ h1 {
     align-items: center;
     width: var(--spacing-12);
     height: var(--spacing-5);
-    padding: var(--spacing-0-75);
+    /* padding: var(--spacing-0-75); */
     color: var(--able-gray-20)
     
 }
@@ -146,3 +149,6 @@ h1 {
 .sq4 {
     background-color: var(--able-coral);
 }
+
+/* Timer */
+
