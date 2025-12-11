@@ -79,10 +79,12 @@ h1 {
     width: var(--spacing-128);
     margin-top: var(--spacing-1);
     margin-bottom: var(--spacing-1);
+    gap: var(--spacing-1)
 }
 
+/*
 #infoBtn {
-    /* color: var(--able-gray-20); */
+    color: var(--able-gray-20);
     color: var(--able-gray-20);
     background-color: var(--able-gray-50);
     height: var(--spacing-3);
@@ -93,6 +95,44 @@ h1 {
     font-family: "Silkscreen", sans-serif; font-weight: 400; font-style: normal;
     font-size: var(--spacing-3);
     
+} */
+
+#infoBtn {
+    margin-top: var(--spacing-1);
+    background-color: var(--able-gray-50);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: var(--spacing-5);
+    height: var(--spacing-5);
+    color: var(--able-gray-20)
+}
+
+.infoColor {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--able-fuchsia-tom);
+    height: var(--spacing-4);
+    width: var(--spacing-4);
+    font-family: "VT323", monospace;
+    font-size: var(--spacing-4);
+    
+
+}
+
+#timer {
+    margin-top: var(--spacing-1);
+    background-color: var(--able-gray-50);
+    font-size: var(--spacing-4);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: var(--spacing-16);
+    height: var(--spacing-5);
+    color: var(--able-gray-20);
+    font-family: "VT323", monospace;
+    font-size: var(--spacing-4);
 }
 
 /* Board section */
@@ -150,5 +190,32 @@ h1 {
     background-color: var(--able-coral);
 }
 
-/* Timer */
+/* Presentationstext - KANSKE tillfällig */
 
+#game-board.title-screen {
+    display: flex;
+    flex-direction: column;      
+    justify-content: center;     
+    align-items: center;         
+    text-align: center;
+    background-color: var(--able-gray-50);
+    height: var(--spacing-64);
+    width: var(--spacing-128);
+    
+}
+
+#game-board.title-screen .main-title {
+    font-size: var(--spacing-24);
+    color: var(--able-gray-20);
+    background-color: var(--able-gray-50);
+    font-family: "VT323", monospace;
+    font-weight: 400;
+    font-style: normal;
+}
+
+#game-board.title-screen .subtitle {
+    font-size: var(--spacing-6);
+    font-family: "Silkscreen", sans-serif; font-weight: 400; font-style: normal; 
+    color: var(--able-gray-20);
+    background-color: var(--able-gray-50);
+}
