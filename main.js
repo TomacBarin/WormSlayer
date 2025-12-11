@@ -1,3 +1,5 @@
+// main.js
+
 const boardHtml = document.querySelector("#game-board");
 
 boardHtml.classList.add("title-screen");
