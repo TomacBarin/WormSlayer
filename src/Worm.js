@@ -1,13 +1,10 @@
-// src/Worm.js (uppdaterad – lägg till powerup i checkCollision)
+// src/Worm.js (uppdaterad – tagit bort tunga-relaterat)
 export default class Worm {
   constructor(color, startX, startY, playerIndex) {
     this.color = color;
     this.playerIndex = playerIndex;
     this.reset(startX, startY);
     this.direction = 'right';
-    this.tongueShots = 0;
-    this.isShooting = false;
-    this.shootTimer = 0;
   }
 
   reset(startX = null, startY = null, cols = 34, rows = 17, occupied = []) {
@@ -30,7 +27,6 @@ export default class Worm {
       { x, y },
       { x: x - 1, y }
     ];
-    this.tongueShots = 0;
   }
 
   move() {
@@ -50,44 +46,11 @@ export default class Worm {
     this.segments.push(tail);
   }
 
-  checkCollision(head, cols, rows, segments, foodPos, powerupPos, obstacles) {
+  checkCollision(head, cols, rows, segments, foodPos, obstacles) {
     if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows) return 'wall';
     if (obstacles.some(obs => obs.x === head.x && obs.y === head.y)) return 'obstacle';
     if (segments.slice(1).some(seg => seg.x === head.x && seg.y === head.y)) return 'self';
     if (head.x === foodPos.x && head.y === foodPos.y) return 'food';
-    if (powerupPos && head.x === powerupPos.x && head.y === powerupPos.y) return 'powerup';  // NYTT
     return null;
-  }
-
-  shootTongue() {
-    if (this.tongueShots > 0 && !this.isShooting) {
-      this.tongueShots--;
-      this.isShooting = true;
-      this.shootTimer = 100;
-    }
-  }
-
-  updateShoot(dt) {
-    if (this.isShooting) {
-      this.shootTimer -= dt;
-      if (this.shootTimer <= 0) this.isShooting = false;
-    }
-  }
-
-  getTonguePositions() {
-    if (!this.isShooting) return [];
-    const head = this.segments[0];
-    const positions = [];
-    for (let i = 1; i <= 3; i++) {
-      const pos = { ...head };
-      switch (this.direction) {
-        case 'right': pos.x += i; break;
-        case 'left': pos.x -= i; break;
-        case 'up': pos.y -= i; break;
-        case 'down': pos.y += i; break;
-      }
-      positions.push(pos);
-    }
-    return positions;
   }
 }

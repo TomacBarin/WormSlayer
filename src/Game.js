@@ -1,7 +1,6 @@
-// src/Game.js (uppdaterad – powerupPos i checkCollision, collision === 'powerup')
+// src/Game.js (uppdaterad – tagit bort powerup och tunga-relaterat)
 import Worm from './Worm.js';
 import Food from './Food.js';
-import Powerup from './Powerup.js';
 import Scoreboard from './Scoreboard.js';
 
 export default class Game {
@@ -19,8 +18,6 @@ export default class Game {
     this.isRunning = false;
     this.worms = [];
     this.food = null;
-    this.powerup = null;
-    this.powerupTimer = 0;
     this.obstacles = [];
     this.timeLeft = 999;
     this.tickInterval = null;
@@ -69,8 +66,6 @@ export default class Game {
     this.offsetY = 0;
     this.timeLeft = 999;
     this.obstacles = [];
-    this.powerupTimer = 0;
-    this.powerup = null;
     this.worms = [
       new Worm('#19E9FF', 3, 3, 0),
       new Worm('#FF2B6F', 30, 3, 1),
@@ -100,24 +95,16 @@ export default class Game {
       return;
     }
 
-    this.powerupTimer++;
-    if (this.powerupTimer >= 75 && !this.powerup) {
-      this.powerup = new Powerup(this.cols, this.rows, this.obstacles);
-      this.powerupTimer = 0;
-    }
-
     const allSegments = [];
     this.worms.forEach(worm => {
       worm.move();
       const head = worm.segments[0];
-      const powerupPos = this.powerup ? this.powerup.pos : null;
       const collision = worm.checkCollision(
         head,
         this.cols,
         this.rows,
         worm.segments,
         this.food.pos,
-        powerupPos,
         this.obstacles
       );
       if (collision === 'wall' || collision === 'self' || collision === 'obstacle') {
@@ -127,27 +114,6 @@ export default class Game {
         worm.grow();
         this.obstacles.push({ ...this.food.pos });
         this.food.newPos(allSegments, this.obstacles);
-      } else if (collision === 'powerup') {
-        worm.tongueShots++;
-        this.powerup = null;
-      }
-
-      worm.updateShoot(132);
-
-      if (worm.isShooting) {
-        const tonguePos = worm.getTonguePositions();
-        tonguePos.forEach(pos => {
-          this.worms.forEach(other => {
-            if (other !== worm && other.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
-              const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-              other.reset(null, null, this.cols, this.rows, occupied);
-            }
-          });
-          const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
-          if (obsIndex > -1) {
-            this.obstacles.splice(obsIndex, 1);
-          }
-        });
       }
 
       allSegments.push(...worm.segments);
@@ -164,20 +130,12 @@ export default class Game {
 
     this.drawGrid();
     this.drawFood();
-    if (this.powerup) this.drawPowerup();
     this.drawWorms();
 
     this.worms.forEach((worm, i) => {
       const score = (worm.segments.length - 1) % 1000;
       if (this.scoreEls[i]) this.scoreEls[i].textContent = score.toString().padStart(3, '0');
     });
-  }
-
-  drawPowerup() {
-    const x = this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap);
-    const y = this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap);
-    this.ctx.fillStyle = '#5CFFE8';
-    this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
   }
 
   drawFood() {
@@ -203,24 +161,6 @@ export default class Game {
           }
         }
       });
-
-      if (worm.isShooting) {
-        const tonguePos = worm.getTonguePositions();
-        tonguePos.forEach(pos => {
-          const x = this.offsetX + pos.x * (this.cellSize + this.gap);
-          const y = this.offsetY + pos.y * (this.cellSize + this.gap);
-          this.ctx.fillStyle = worm.color;
-          if (worm.direction === 'left' || worm.direction === 'right') {
-            const width = this.cellSize;
-            const height = Math.round(this.cellSize * 0.01);  // 1% (tunn!)
-            this.ctx.fillRect(x, y + (this.cellSize - height) / 2, width, height);
-          } else {
-            const width = Math.round(this.cellSize * 0.01);
-            const height = this.cellSize;
-            this.ctx.fillRect(x + (this.cellSize - width) / 2, y, width, height);
-          }
-        });
-      }
     });
   }
 
