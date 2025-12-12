@@ -206,3 +206,7 @@ h1 {
     color: var(--able-gray-20);
     background-color: var(--able-gray-50);
 }
+
+#game-board {
+    background-color: var(--able-gray-20) !important;  /* #2D2D2D alltid för marginal/gap */
+}
