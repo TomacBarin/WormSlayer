@@ -22,10 +22,14 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (game.isRunning) {
+    const key = e.key.toLowerCase();
+    if (key === ' ') {  // Shoot tunga för alla (kaos!)
+      game.worms.forEach(worm => worm.shootTongue());
+      return;
+    }
     keyMaps.forEach((map, i) => {
       const worm = game.worms[i];
       if (!worm) return;
-      const key = e.key.toLowerCase();
       if (key === map.up.toLowerCase() && worm.direction !== 'down') worm.direction = 'up';
       if (key === map.down.toLowerCase() && worm.direction !== 'up') worm.direction = 'down';
       if (key === map.left.toLowerCase() && worm.direction !== 'right') worm.direction = 'left';
@@ -49,6 +53,8 @@ infoBtn.addEventListener('click', () => {
       <p style="font-size: 28px; line-height: 1.4;">
         • Styr din mask med pilar/WASD/TFGH/IJKL.<br>
         • Ät vit mat → växt + poäng + mörkt hål (farligt!).<br>
+        • Ät aqua-ruta → +1 tungskott (space skjuter!).<br>
+        • Tunga dödar annan mask eller fyller igen hål inom 3 rutor.<br>
         • Krock vägg/kropp/hål/annan mask → reset (längd 2).<br>
         • Längst vid tid 0 vinner!<br>
         • 4 spelare lokal. Multiplayer kommer!
