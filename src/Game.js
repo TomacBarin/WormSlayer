@@ -1,6 +1,6 @@
-// src/Game.js (uppdaterad – tagit bort powerup och tunga-relaterat)
 import Worm from './Worm.js';
 import Food from './Food.js';
+import Powerup from './Powerup.js';
 import Scoreboard from './Scoreboard.js';
 
 export default class Game {
@@ -18,6 +18,9 @@ export default class Game {
     this.isRunning = false;
     this.worms = [];
     this.food = null;
+    this.powerup = null;
+    this.powerupTimer = 0;
+    this.foodEaten = false;  // NY: Flagga för mat-respawn
     this.obstacles = [];
     this.timeLeft = 999;
     this.tickInterval = null;
@@ -62,21 +65,23 @@ export default class Game {
 
   start() {
     this.isRunning = true;
-    this.offsetX = 0;
-    this.offsetY = 0;
     this.timeLeft = 999;
     this.obstacles = [];
+    this.powerupTimer = 0;
+    this.powerup = null;
+    this.foodEaten = false;
     this.worms = [
       new Worm('#19E9FF', 3, 3, 0),
       new Worm('#FF2B6F', 30, 3, 1),
       new Worm('#FFF034', 3, 14, 2),
       new Worm('#FF94A6', 30, 14, 3)
     ];
-    this.food = new Food(this.cols, this.rows, this.obstacles);
+    this.food = new Food(this.cols, this.rows);
     this.tickInterval = setInterval(this.update.bind(this), 132);
     this.update();
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
     this.scoreEls.forEach(el => el.textContent = '000');
+    // INGEN offset=0 här – centrering alltid!
   }
 
   stop() {
@@ -95,16 +100,28 @@ export default class Game {
       return;
     }
 
-    const allSegments = [];
+    // Reset flags
+    this.foodEaten = false;
+
+    // Powerup spawn var ~10s (75 ticks)
+    this.powerupTimer++;
+    if (this.powerupTimer >= 75 && !this.powerup) {
+      // Spawn säkert (tom occupied för approx)
+      this.powerup = new Powerup(this.cols, this.rows);
+      this.powerupTimer = 0;
+    }
+
     this.worms.forEach(worm => {
       worm.move();
       const head = worm.segments[0];
+      const powerupPos = this.powerup ? this.powerup.pos : null;
       const collision = worm.checkCollision(
         head,
         this.cols,
         this.rows,
         worm.segments,
         this.food.pos,
+        powerupPos,
         this.obstacles
       );
       if (collision === 'wall' || collision === 'self' || collision === 'obstacle') {
@@ -113,12 +130,44 @@ export default class Game {
       } else if (collision === 'food') {
         worm.grow();
         this.obstacles.push({ ...this.food.pos });
-        this.food.newPos(allSegments, this.obstacles);
+        this.foodEaten = true;  // FIX: Flagga för respawn
+      } else if (collision === 'powerup') {
+        worm.tongueShots++;
+        this.powerup = null;
+        this.powerupTimer = 0;  // NY: Ny timer efter ät
       }
 
-      allSegments.push(...worm.segments);
+      worm.updateShoot();  // FIX: Tick-baserad, ingen dt
     });
 
+    // NY: Respawn mat BARA om äten (fixar blinking!)
+    if (this.foodEaten) {
+      const occupied = this.worms.flatMap(w => w.segments).concat(this.obstacles);
+      this.food.newPos(occupied);
+    }
+
+    // Tongue effects
+    this.worms.forEach(worm => {
+      if (worm.isShooting) {
+        const tonguePos = worm.getTonguePositions(this.cols, this.rows);
+        tonguePos.forEach(pos => {
+          // Dödar andra maskar
+          this.worms.forEach(other => {
+            if (other !== worm && other.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
+              const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
+              other.reset(null, null, this.cols, this.rows, occupied);
+            }
+          });
+          // Fyller hål
+          const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
+          if (obsIndex > -1) {
+            this.obstacles.splice(obsIndex, 1);
+          }
+        });
+      }
+    });
+
+    // Head-in-body kollisioner
     this.worms.forEach((worm, i) => {
       const head = worm.segments[0];
       const hitOther = this.worms.some((other, j) => i !== j && other.segments.some(seg => seg.x === head.x && seg.y === head.y));
@@ -130,12 +179,20 @@ export default class Game {
 
     this.drawGrid();
     this.drawFood();
+    if (this.powerup) this.drawPowerup();
     this.drawWorms();
 
     this.worms.forEach((worm, i) => {
       const score = (worm.segments.length - 1) % 1000;
       if (this.scoreEls[i]) this.scoreEls[i].textContent = score.toString().padStart(3, '0');
     });
+  }
+
+  drawPowerup() {
+    const x = this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap);
+    const y = this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap);
+    this.ctx.fillStyle = '#5CFFE8';
+    this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
   }
 
   drawFood() {
@@ -161,6 +218,25 @@ export default class Game {
           }
         }
       });
+
+      if (worm.isShooting) {
+        const tonguePos = worm.getTonguePositions(this.cols, this.rows);
+        tonguePos.forEach(pos => {
+          if (pos.x >= 0 && pos.x < this.cols && pos.y >= 0 && pos.y < this.rows) {
+            const x = this.offsetX + pos.x * (this.cellSize + this.gap);
+            const y = this.offsetY + pos.y * (this.cellSize + this.gap);
+            this.ctx.fillStyle = worm.color;
+            const thickness = Math.max(2, Math.round(this.cellSize * 0.12));  // FIX: 2-4px tjock – SYNlig retro-tunga!
+            if (worm.direction === 'left' || worm.direction === 'right') {
+              const height = thickness;
+              this.ctx.fillRect(x, y + (this.cellSize - height) / 2, this.cellSize, height);
+            } else {
+              const width = thickness;
+              this.ctx.fillRect(x + (this.cellSize - width) / 2, y, width, this.cellSize);
+            }
+          }
+        });
+      }
     });
   }
 
@@ -191,13 +267,13 @@ export default class Game {
     this.ctx.fillStyle = '#EEEEEE';
     this.ctx.fillText('Press enter to play again', this.canvas.width / 2, this.canvas.height / 2 + 130);
 
-    // Scoreboard
     const finalScores = this.worms.map(w => ({ name: `Player ${w.playerIndex + 1}`, score: w.segments.length - 1 }));
     const maxScore = Math.max(...finalScores.map(s => s.score));
-    const winnerName = finalScores.find(s => s.score === maxScore).name;
+    const winnerName = finalScores.find(s => s.score === maxScore)?.name || 'Player 1';
     const name = prompt('Ditt namn för highscore? (för vinnaren)');
     if (name) Scoreboard.add(name, maxScore);
     else Scoreboard.add(winnerName, maxScore);
+
     const sbContainer = document.createElement('div');
     sbContainer.style.cssText = `
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 

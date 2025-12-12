@@ -23,6 +23,10 @@ document.addEventListener('keydown', (e) => {
   }
   if (game.isRunning) {
     const key = e.key.toLowerCase();
+    if (key === ' ') {  // Space skjuter tunga för ALLA maskar (kaos!)
+      game.worms.forEach(worm => worm.shootTongue());
+      return;
+    }
     keyMaps.forEach((map, i) => {
       const worm = game.worms[i];
       if (!worm) return;
@@ -49,9 +53,11 @@ infoBtn.addEventListener('click', () => {
       <p style="font-size: 28px; line-height: 1.4;">
         • Styr din mask med pilar/WASD/TFGH/IJKL.<br>
         • Ät vit mat → växt + poäng + mörkt hål (farligt!).<br>
+        • Ät aqua-ruta (var 10s) → +1 tungskott.<br>
+        • Space skjuter tunga (3 rutor fram, för alla!).<br>
+        • Tunga dödar fiende eller fyller hål inom räckvidd.<br>
         • Krock vägg/kropp/hål/annan mask → reset (längd 2).<br>
-        • Längst vid tid 0 vinner!<br>
-        • 4 spelare lokal. Multiplayer kommer!
+        • Längst vid tid 0 vinner! 4P lokal kaos.
       </p>
       <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #19E9FF; border: none; cursor: pointer;">Stäng</button>
     </div>
