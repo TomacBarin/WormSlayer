@@ -1,7 +1,9 @@
 import Game from './Game.js';
+import { MultiplayerApi } from './MultiplayerApi.js';
 
 const canvas = document.getElementById('game-board');
 const game = new Game(canvas);
+const api = new MultiplayerApi('ws://localhost:8080/multiplayer', crypto.randomUUID());
 
 // Keymaps för 4 spelare
 const keyMaps = [
@@ -14,27 +16,43 @@ const keyMaps = [
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     if (!game.isRunning) {
-      game.start();
+      game.start(false);
     } else {
       game.stop();
-      game.start();  // Restart
+      game.start(false);  // Restart local
     }
     return;
   }
   if (game.isRunning) {
     const key = e.key.toLowerCase();
-    if (key === ' ') {  // Space skjuter tunga för ALLA maskar (kaos!)
-      game.worms.forEach(worm => worm.shootTongue());
+    if (key === ' ') {  // Space skjuter tunga
+      if (!game.isMultiplayer) {
+        game.worms.forEach(worm => worm.shootTongue());
+      } else if (!game.isHost) {
+        game.api.game({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
+      }
       return;
     }
-    keyMaps.forEach((map, i) => {
-      const worm = game.worms[i];
-      if (!worm) return;
-      if (key === map.up.toLowerCase() && worm.direction !== 'down') worm.direction = 'up';
-      if (key === map.down.toLowerCase() && worm.direction !== 'up') worm.direction = 'down';
-      if (key === map.left.toLowerCase() && worm.direction !== 'right') worm.direction = 'left';
-      if (key === map.right.toLowerCase() && worm.direction !== 'left') worm.direction = 'right';
-    });
+    if (!game.isMultiplayer) {
+      keyMaps.forEach((map, i) => {
+        const worm = game.worms[i];
+        if (!worm) return;
+        if (key === map.up.toLowerCase() && worm.direction !== 'down') worm.direction = 'up';
+        if (key === map.down.toLowerCase() && worm.direction !== 'up') worm.direction = 'down';
+        if (key === map.left.toLowerCase() && worm.direction !== 'right') worm.direction = 'left';
+        if (key === map.right.toLowerCase() && worm.direction !== 'left') worm.direction = 'right';
+      });
+    } else if (!game.isHost) {
+      let direction = null;
+      const map = keyMaps[game.myPlayerIndex] || keyMaps[0];
+      if (key === map.up.toLowerCase()) direction = 'up';
+      if (key === map.down.toLowerCase()) direction = 'down';
+      if (key === map.left.toLowerCase()) direction = 'left';
+      if (key === map.right.toLowerCase()) direction = 'right';
+      if (direction && game.worms[game.myPlayerIndex]?.direction !== opposite(direction)) {
+        game.api.game({ type: 'input', playerIndex: game.myPlayerIndex, direction });
+      }
+    }
   }
 });
 
@@ -64,5 +82,58 @@ infoBtn.addEventListener('click', () => {
   `;
   document.body.appendChild(popup);
 });
+
+// Start multiplayer
+async function startMultiplayer(isHost) {
+  game.isMultiplayer = true;
+  game.isHost = isHost;
+  game.api = api;
+  game.messageBuffer = [];
+  game.lastMessageId = -1;
+
+  const unsubscribe = api.listen((event, messageId, clientId, data) => {
+    if (event === 'joined') {
+      if (game.isHost) {
+        const playerIndex = game.worms.length;
+        const occupied = game.obstacles.concat(game.worms.flatMap(w => w.segments));
+        const newWorm = new Worm(colors[playerIndex % colors.length], null, null, playerIndex);
+        newWorm.reset(null, null, game.cols, game.rows, occupied);
+        game.worms.push(newWorm);
+        game.api.game({ type: 'assign', playerIndex }, clientId);
+        game.api.game({ type: 'state', ...game.getFullState() });
+      }
+    } else if (event === 'game') {
+      game.messageBuffer.push({ messageId, data });
+      game.messageBuffer.sort((a, b) => a.messageId - b.messageId);
+      while (game.messageBuffer.length && game.messageBuffer[0].messageId === game.lastMessageId + 1) {
+        const msg = game.messageBuffer.shift();
+        game.lastMessageId = msg.messageId;
+        game.processMessage(msg.data);
+      }
+    }
+  });
+
+  if (isHost) {
+    const { session } = await api.host({ name: 'WormSlayer', private: false });
+    alert(`Session ID: ${session}`);
+    game.myPlayerIndex = 0;
+    game.start(true);
+  } else {
+    const sessionID = prompt('Ange Session ID:');
+    await api.join(sessionID, { name: 'Guest' });
+    game.myPlayerIndex = -1;  // Vänta på assign
+    game.start(true);
+  }
+}
+
+// Hjälpfunktion
+function opposite(dir) {
+  if (dir === 'up') return 'down';
+  if (dir === 'down') return 'up';
+  if (dir === 'left') return 'right';
+  if (dir === 'right') return 'left';
+}
+
+const colors = ['#19E9FF', '#FF2B6F', '#FFF034', '#FF94A6'];
 
 game.drawTitleScreen();
