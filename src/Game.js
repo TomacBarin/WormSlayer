@@ -23,7 +23,7 @@ export default class Game {
     this.api = null;
     this.myPlayerIndex = null;
     this.lastFrameTime = 0;
-    this.frameInterval = 150;  // NY: 400 BPM = 150ms/tick
+    this.frameInterval = 120;  // 500 BPM = 120ms/tick
     this.frameCounter = 0;
     this.worms = [];
     this.food = null;
@@ -66,21 +66,22 @@ export default class Game {
     this.ctx.textBaseline = 'middle';
     this.ctx.font = '192px VT323, monospace';
     this.ctx.fillStyle = '#2D2D2D';
-    this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 140);
+    this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 140);  // Lite mer space upp
     this.ctx.fillText('CRAWLER', this.canvas.width / 2, this.canvas.height / 2 + 10);
 
+    // Streck (linje) mellan titel och undertext
     this.ctx.strokeStyle = '#2D2D2D';
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 2;  // Tjocklek på strecket
     this.ctx.beginPath();
-    this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 95);
-    this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 95);
+    this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 95);  // Start vänster
+    this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 95);  // Slut höger
     this.ctx.stroke();
 
     this.ctx.font = '36px Silkscreen, sans-serif';
-    this.ctx.fillStyle = '#2D2D2D';
-    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);
+    this.ctx.fillStyle = '#2D2D2D';  // Samma mörka färg
+    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);  // Mer space ned
     this.ctx.font = '24px Silkscreen, sans-serif';
-    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);
+    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
   }
 
   drawGrid() {
@@ -169,23 +170,34 @@ export default class Game {
 
     if (this.isHost || !this.isMultiplayer) {
       this.powerupTimer++;
-      // NY: Spawn/repone ny powerup var 67 ticks (~10s vid 150ms/tick), oavsett om en finns
-      if (this.powerupTimer >= 67) {
+      if (this.powerupTimer >= 83) {
         const occupied = this.getAllOccupied();
         if (this.powerup) {
-          this.powerup.newPos(occupied);  // Repositionera befintlig
+          this.powerup.newPos(occupied);
         } else {
-          this.powerup = new Powerup(this.cols, this.rows, occupied);  // Skapa ny
+          this.powerup = new Powerup(this.cols, this.rows, occupied);
         }
         this.powerupTimer = 0;
-        new Audio(this.fxNewPower).play();  // FX alltid vid spawn/reposition
+        new Audio(this.fxNewPower).play();
       }
 
       this.worms.forEach((worm, index) => {
         worm.updateShoot();
         const head = { ...worm.segments[0] };
         worm.move(this.cols, this.rows);
-        const collision = worm.checkCollision(worm.segments[0], this.cols, this.rows, worm.segments, this.food?.pos, this.powerup?.pos, this.obstacles);
+        const newHead = worm.segments[0];
+
+        let hitOtherWorm = false;
+        this.worms.forEach((otherWorm, otherIndex) => {
+          if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+            const occupied = this.getAllOccupied();
+            otherWorm.reset(null, null, this.cols, this.rows, occupied);
+            new Audio(this.fxMiss).play();  // för den andra masken
+            hitOtherWorm = true;
+          }
+        });
+
+        const collision = worm.checkCollision(newHead, this.cols, this.rows, worm.segments, this.food?.pos, this.powerup?.pos, this.obstacles);
 
         if (collision === 'food') {
           worm.grow();
@@ -196,13 +208,12 @@ export default class Game {
           new Audio(this.fxEatFood).play();
         } else if (collision === 'powerup') {
           worm.tongueShots++;
-          // NY: Ta bort powerup helt efter ätning (istället för newPos) – ny spawnas via timer
           this.powerup = null;
           new Audio(this.fxPowerUp).play();
-        } else if (collision === 'wall' || collision === 'self' || collision === 'obstacle') {
+        } else if (collision === 'wall' || collision === 'self' || collision === 'obstacle' || hitOtherWorm) {
           const occupied = this.getAllOccupied();
           worm.reset(null, null, this.cols, this.rows, occupied);
-          new Audio(this.fxMiss).play();
+          new Audio(this.fxMiss).play();  // för den egna masken
         }
 
         if (worm.isShooting) {
