@@ -51,21 +51,30 @@ export default class Game {
     this.offsetY = (512 - (this.rows * this.cellSize + (this.rows - 1) * this.gap)) / 2;
   }
 
-  drawTitleScreen() {
-    this.ctx.fillStyle = this.introBgColor;
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.font = '192px VT323, monospace';
-    this.ctx.fillStyle = '#2D2D2D';
-    this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 80);
-    this.ctx.fillText('CRAWLER', this.canvas.width / 2, this.canvas.height / 2 - 20);
-    this.ctx.font = '36px Silkscreen, sans-serif';
-    this.ctx.fillStyle = '#EEEEEE';
-    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 60);
-    this.ctx.font = '24px Silkscreen, sans-serif';
-    this.ctx.fillText('H: Host Multi | J: Join Multi', this.canvas.width / 2, this.canvas.height / 2 + 100);
-  }
+drawTitleScreen() {
+  this.ctx.fillStyle = this.introBgColor;
+  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  this.ctx.textAlign = 'center';
+  this.ctx.textBaseline = 'middle';
+  this.ctx.font = '192px VT323, monospace';
+  this.ctx.fillStyle = '#2D2D2D';
+  this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 140);  // Lite mer space upp
+  this.ctx.fillText('CRAWLER', this.canvas.width / 2, this.canvas.height / 2 + 10);
+
+  // Streck (linje) mellan titel och undertext
+  this.ctx.strokeStyle = '#2D2D2D';
+  this.ctx.lineWidth = 2;  // Tjocklek på strecket
+  this.ctx.beginPath();
+  this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 95);  // Start vänster
+  this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 95);  // Slut höger
+  this.ctx.stroke();
+
+  this.ctx.font = '36px Silkscreen, sans-serif';
+  this.ctx.fillStyle = '#2D2D2D';  // Samma mörka färg
+  this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);  // Mer space ned
+  this.ctx.font = '24px Silkscreen, sans-serif';
+  this.ctx.fillText('H: Host Multi | J: Join Multi', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
+}
 
   drawGrid() {
     this.ctx.fillStyle = this.gameBgColor;
