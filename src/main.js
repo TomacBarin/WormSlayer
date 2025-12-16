@@ -107,7 +107,7 @@ infoBtn.addEventListener('click', () => {
         • PowerUp = Dödar fiender och lagar hål.<br>
         • Använd space för powerup.<br>
         • Krock med vägg/kropp/hål/mask → reset.<br>
-        • Längst när timern tagit slut vinner!.
+        • Längst när timern tagit slut vinner.
       </p>
       <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #EEEEEE; border: none; cursor: pointer;">Stäng</button>
     </div>
