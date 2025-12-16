@@ -101,15 +101,15 @@ infoBtn.addEventListener('click', () => {
     <div style="background: #484848; padding: 48px; max-width: 80%; max-height: 80%; overflow: auto; border: 4px solid #646464;">
       <h1 style="font-size: 64px; text-align: center; margin-bottom: 32px;">REGLER</h1>
       <p style="font-size: 28px; line-height: 1.4;">
-        • Styr din mask med pilar/WASD/TFGH/IJKL.<br>
-        • Ät vit mat → växt + poäng + mörkt hål (farligt!).<br>
-        • Ät orange-ruta (var 10s) → +1 tungskott.<br>
-        • Space skjuter tunga (3 rutor fram, för alla!).<br>
-        • Tunga dödar fiende eller fyller hål inom räckvidd.<br>
-        • Krock vägg/kropp/hål/annan mask → reset (längd 2).<br>
-        • Längst vid tid 0 vinner! 4P lokal kaos.
+        • Styr med pilar/WASD/TFGH/IJKL.<br>
+        • Vit mat → växt + poäng + mörkt hål (dåligt).<br>
+        • Orange mat → PowerUp.<br>
+        • PowerUp = Dödar fiender och lagar hål.<br>
+        • Använd space för powerup.<br>
+        • Krock med vägg/kropp/hål/mask → reset.<br>
+        • Längst när timern tagit slut vinner!.
       </p>
-      <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #19E9FF; border: none; cursor: pointer;">Stäng</button>
+      <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #EEEEEE; border: none; cursor: pointer;">Stäng</button>
     </div>
   `;
   document.body.appendChild(popup);
