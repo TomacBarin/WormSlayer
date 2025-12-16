@@ -3,7 +3,7 @@ import { mpapi } from './mpapi.js';  // NY: Från nya repo
 
 const canvas = document.getElementById('game-board');
 const game = new Game(canvas);
-const api = new mpapi('wss://mpapi.se/multiplayer', crypto.randomUUID());  // NY: Public server, ingen lokal!
+const api = new mpapi('ws://localhost:8080/net', crypto.randomUUID());  // Korrigerad URL med /net!
 
 // Keymaps för 4 spelare
 const keyMaps = [
@@ -40,14 +40,14 @@ document.addEventListener('keydown', (e) => {
   if (game.isRunning) {
     const key = e.key.toLowerCase();
     if (key === ' ') {  // Space skjuter tunga
-      if (!game.isMultiplayer) {
+      if (!game.isMultiplayer || game.isHost) {
         game.worms.forEach(worm => worm.shootTongue());
-      } else if (!game.isHost) {
+      } else {
         game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
       }
       return;
     }
-    if (!game.isMultiplayer) {
+    if (!game.isMultiplayer || game.isHost) {  // Fix: Hantera keys lokalt för host i multi
       keyMaps.forEach((map, i) => {
         const worm = game.worms[i];
         if (!worm) return;
@@ -56,7 +56,7 @@ document.addEventListener('keydown', (e) => {
         if (key === map.left.toLowerCase() && worm.direction !== 'right') worm.direction = 'left';
         if (key === map.right.toLowerCase() && worm.direction !== 'left') worm.direction = 'right';
       });
-    } else if (!game.isHost) {
+    } else {  // Klient: Skicka input
       let direction = null;
       const map = keyMaps[game.myPlayerIndex] || keyMaps[0];
       if (key === map.up.toLowerCase()) direction = 'up';

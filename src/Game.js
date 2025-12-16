@@ -200,7 +200,11 @@ export default class Game {
     });
 
     if (this.isMultiplayer && this.isHost) {
-      this.api.game({ type: 'state', ...this.getFullState() });
+      try {
+        this.api.transmit({ type: 'state', ...this.getFullState() });  // Fix: transmit istället för game
+      } catch (e) {
+        console.error('Transmit error:', e);  // Fånga errors för att undvika spam
+      }
     }
   }
 
