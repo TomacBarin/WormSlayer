@@ -47,16 +47,16 @@
 
 @font-face {
   font-family: 'VT323';
-  src: url('/assets/fonts/VT323-Regular.ttf') format('truetype');
+  src: url('assets/fonts/VT323-Regular.ttf') format('truetype');
 }
 @font-face {
   font-family: 'Silkscreen';
-  src: url('/assets/fonts/Silkscreen-Regular.ttf') format('truetype');
+  src: url('assets/fonts/Silkscreen-Regular.ttf') format('truetype');
 }
 
 * {
     background-color: var(--able-gray-20);
-    font-family: "VT323", "Courier New", monospace;   
+    font-family: "VT323", monospace;   
     font-weight: 400;
     font-style: normal;
     margin: 0;
@@ -105,7 +105,7 @@ h1 {
     background-color: var(--able-fuchsia-tom);
     height: var(--spacing-4);
     width: var(--spacing-4);
-    font-family: "VT323", "Courier New", monospace;
+    font-family: "VT323", monospace;
     font-size: var(--spacing-4);
     
 
@@ -121,7 +121,7 @@ h1 {
     width: var(--spacing-16);
     height: var(--spacing-5);
     color: var(--able-gray-20);
-    font-family: "VT323", "Courier New", monospace;
+    font-family: "VT323", monospace;
     font-size: var(--spacing-4);
 }
 
@@ -199,7 +199,7 @@ h1 {
     font-size: var(--spacing-24);
     color: var(--able-gray-20);
     background-color: var(--able-gray-50);
-    font-family: "VT323", "Courier New", monospace;
+    font-family: "VT323", monospace;
     font-weight: 400;
     font-style: normal;
 }

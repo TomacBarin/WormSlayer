@@ -4,18 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="styles.css" />
-    <!-- PRELOAD FONTS för incognito-fix -->
+    <!-- Preload local fonts -->
     <link
       rel="preload"
-      href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
+      href="assets/fonts/VT323-Regular.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
     />
-    <noscript
-      ><link
-        href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap"
-        rel="stylesheet"
-    /></noscript>
+    <link
+      rel="preload"
+      href="assets/fonts/Silkscreen-Regular.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
     <script type="module" src="./src/main.js"></script>
     <title>Square Crawler: The Game</title>
   </head>
