@@ -1,19 +1,4 @@
-/*
-
-Konstruktion:
-  const api = new MultiplayerApi('ws://localhost:8080', "YOUR-APP-IDENTIFIER-UUID");
-
-Metoder:
-  api.host();                   											// Skapar ny session via servern.
-  api.join('ABC123');           											// Ansluter till befintlig session med given sessionskod.
-  api.game(dataObj);     													// Skickar godtycklig speldata till alla klienter i sessionen.
-  const unsubscribe = api.listen((event, messageId, clientId, data) => {
-																			// Reagera på inkommande speldata och sessionshändelser.
-  });
-  unsubscribe();                 											// Slutar lyssna på inkommande speldata.
-*/
-
-export class MultiplayerApi {
+export class mpapi {
 	constructor(serverUrl, identifier) {
 		this.serverUrl = serverUrl;
 		this.identifier = identifier;
@@ -35,26 +20,27 @@ export class MultiplayerApi {
 
 		this.socket = new WebSocket(this.serverUrl);
 
-		console.log('Connecting to multiplayer server at', this.serverUrl);
+		console.log('Connecting to mpapi server at', this.serverUrl);
 
 		this.socket.addEventListener('open', () => {
-			console.log('WebSocket connection established');
+			console.log('WebSocket connection established and open');
 
 			const pending = this.queue.slice();
 			this.queue.length = 0;
 			for (let i = 0; i < pending.length; i += 1) {
+				console.log('Sending pending message:', pending[i]);
 				this.socket.send(pending[i]);
 			}
 		});
 
 		console.log('Setting up WebSocket event listeners');
 
-
 		this.socket.addEventListener('message', (event) => {
 			let payload;
 			try {
 				payload = JSON.parse(event.data);
 			} catch (e) {
+				console.error('Failed to parse message:', e);
 				return;
 			}
 
@@ -67,7 +53,6 @@ export class MultiplayerApi {
 			}
 
 			console.log('Received payload:', payload);
-
 
 			const cmd = payload.cmd;
 			const messageId = typeof payload.messageId === 'number' ? payload.messageId : null;
@@ -118,19 +103,22 @@ export class MultiplayerApi {
 		});
 
 		this.socket.addEventListener('close', () => {
+			console.log('WebSocket connection closed');
 			this.socket = null;
 		});
 
 		this.socket.addEventListener('error', (e) => {
-			console.error('WebSocket error occurred', e);
+			console.error('WebSocket error occurred:', e);
 			// Ingen ytterligare hantering här; spelkoden kan själv reagera på uteblivna meddelanden.
 		});
 	}
 
 	_enqueueOrSend(serializedMessage) {
 		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+			console.log('Sending message:', serializedMessage);
 			this.socket.send(serializedMessage);
 		} else {
+			console.log('Queuing message (socket not open):', serializedMessage);
 			this.queue.push(serializedMessage);
 			this._connect();
 		}
@@ -162,6 +150,7 @@ export class MultiplayerApi {
 			this._enqueueOrSend(serialized);
 
 			this.onHost = (session, clientId, data) => {
+				console.log('Host callback triggered with session:', session);
 				this.onHost = null;
 				return resolve({ session, clientId, data });
 			};
@@ -187,6 +176,7 @@ export class MultiplayerApi {
 			*/
 
 			this.onJoin = (data) => {
+				console.log('Join callback triggered');
 				this.onJoin = null;
 				return resolve(data);
 			};
@@ -203,19 +193,20 @@ export class MultiplayerApi {
 		this.sessionId = null;
 	}
 
-	list() {
+	// type can be 'sessions' or 'clients'
+	list(type = "sessions") {
 		return new Promise((resolve, reject) => {
 			this.onList = (data) => {
 				this.onList = null;
 				return resolve(data);
 			};
 
-			const serialized = this._buildPayload('list', {});
+			const serialized = this._buildPayload('list', { type });
 			this._enqueueOrSend(serialized);
 		});
 	}
 
-	game(data, destination = null) {
+	transmit(data, destination = null) {
 		const serialized = this._buildPayload('game', data, destination);
 		this._enqueueOrSend(serialized);
 	}

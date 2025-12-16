@@ -1,9 +1,9 @@
 import Game from './Game.js';
-import { MultiplayerApi } from './MultiplayerApi.js';
+import { mpapi } from './mpapi.js';  // NY: Från nya repo
 
 const canvas = document.getElementById('game-board');
 const game = new Game(canvas);
-const api = new MultiplayerApi('ws://localhost:8080/multiplayer', crypto.randomUUID());
+const api = new mpapi('wss://mpapi.se/multiplayer', crypto.randomUUID());  // NY: Public server, ingen lokal!
 
 // Keymaps för 4 spelare
 const keyMaps = [
@@ -43,7 +43,7 @@ document.addEventListener('keydown', (e) => {
       if (!game.isMultiplayer) {
         game.worms.forEach(worm => worm.shootTongue());
       } else if (!game.isHost) {
-        game.api.game({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
+        game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
       }
       return;
     }
@@ -64,7 +64,7 @@ document.addEventListener('keydown', (e) => {
       if (key === map.left.toLowerCase()) direction = 'left';
       if (key === map.right.toLowerCase()) direction = 'right';
       if (direction && game.worms[game.myPlayerIndex]?.direction !== opposite(direction)) {
-        game.api.game({ type: 'input', playerIndex: game.myPlayerIndex, direction });
+        game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, direction });
       }
     }
   }
@@ -113,8 +113,8 @@ async function startMultiplayer(isHost) {
         const newWorm = new Worm(colors[playerIndex % colors.length], null, null, playerIndex);
         newWorm.reset(null, null, game.cols, game.rows, occupied);
         game.worms.push(newWorm);
-        game.api.game({ type: 'assign', playerIndex }, clientId);
-        game.api.game({ type: 'state', ...game.getFullState() });
+        game.api.transmit({ type: 'assign', playerIndex }, clientId);
+        game.api.transmit({ type: 'state', ...game.getFullState() });
       }
     } else if (event === 'game') {
       game.messageBuffer.push({ messageId, data });
@@ -128,15 +128,32 @@ async function startMultiplayer(isHost) {
   });
 
   if (isHost) {
-    const { session } = await api.host({ name: 'WormSlayer', private: false });
-    alert(`Session ID: ${session}`);
-    game.myPlayerIndex = 0;
-    game.start(true);
+    const hostPromise = api.host({ name: 'WormSlayer', private: false });
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 5000));
+    Promise.race([hostPromise, timeoutPromise])
+      .then(({ session }) => {
+        alert(`Session ID: ${session}`);
+        game.myPlayerIndex = 0;
+        game.start(true);
+      })
+      .catch(e => {
+        console.error('Host error:', e);
+        alert('Failed to host: ' + e);
+      });
   } else {
     const sessionID = prompt('Ange Session ID:');
-    await api.join(sessionID, { name: 'Guest' });
-    game.myPlayerIndex = -1;  // Vänta på assign
-    game.start(true);
+    if (!sessionID) return; // Avbryt om tomt
+    const joinPromise = api.join(sessionID, { name: 'Guest' });
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 5000));
+    Promise.race([joinPromise, timeoutPromise])
+      .then(() => {
+        game.myPlayerIndex = -1;  // Vänta på assign
+        game.start(true);
+      })
+      .catch(e => {
+        console.error('Join error:', e);
+        alert('Failed to join: ' + e);
+      });
   }
 }
 
