@@ -23,7 +23,7 @@ export default class Game {
     this.api = null;
     this.myPlayerIndex = null;
     this.lastFrameTime = 0;
-    this.frameInterval = 100;  // ~10 updates/sec
+    this.frameInterval = 66;  // FIX: ~15 FPS för bättre känsla (120 BPM-syncbart)
     this.frameCounter = 0;
     this.worms = [];
     this.food = null;
@@ -42,6 +42,7 @@ export default class Game {
     if (dir === 'down') return 'up';
     if (dir === 'left') return 'right';
     if (dir === 'right') return 'left';
+    return null;
   }
 
   updateOffsets() {
@@ -99,7 +100,7 @@ export default class Game {
     }
     this.lastFrameTime = performance.now();
     this.frameCounter = 0;
-    requestAnimationFrame(this.update.bind(this));  // NY: Starta rAF
+    requestAnimationFrame(this.update.bind(this));
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
     this.scoreEls.forEach(el => el.textContent = '000');
   }
@@ -134,7 +135,13 @@ export default class Game {
 
     const isFullLogic = this.isHost || !this.isMultiplayer;
 
-    this.foodEaten = false;
+    // FIX: ALLTID move alla worms (prediktion på klient)
+    this.worms.forEach(worm => {
+      worm.move(this.cols, this.rows);
+      worm.updateShoot();
+    });
+
+    // FIX: Powerup spawn bara på host/lokal
     this.powerupTimer++;
     if (this.powerupTimer >= 75 && !this.powerup && isFullLogic) {
       const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
@@ -142,9 +149,10 @@ export default class Game {
       this.powerupTimer = 0;
     }
 
-    this.worms.forEach(worm => {
-      worm.move(isFullLogic, this.cols, this.rows);
-      if (isFullLogic) {
+    // FIX: Collision/logic GROW/FOOD/RESET bara på host/lokal
+    if (isFullLogic) {
+      this.foodEaten = false;
+      this.worms.forEach(worm => {
         const head = worm.segments[0];
         const powerupPos = this.powerup ? this.powerup.pos : null;
         const collision = worm.checkCollision(
@@ -163,21 +171,20 @@ export default class Game {
           worm.grow();
           this.obstacles.push({ ...this.food.pos });
           this.foodEaten = true;
+          // Ljud här: new Audio('eat.wav').play();
         } else if (collision === 'powerup') {
           worm.tongueShots++;
           this.powerup = null;
           this.powerupTimer = 0;
         }
+      });
+
+      if (this.foodEaten) {
+        const occupied = this.worms.flatMap(w => w.segments).concat(this.obstacles);
+        this.food.newPos(occupied);
       }
-      worm.updateShoot();
-    });
 
-    if (this.foodEaten && isFullLogic) {
-      const occupied = this.worms.flatMap(w => w.segments).concat(this.obstacles);
-      this.food.newPos(occupied);
-    }
-
-    if (isFullLogic) {
+      // Tunga-effekter bara på host
       this.worms.forEach(worm => {
         if (worm.isShooting) {
           const tonguePos = worm.getTonguePositions(this.cols, this.rows);
@@ -196,6 +203,7 @@ export default class Game {
         }
       });
 
+      // Mask-mot-mask kollision
       this.worms.forEach((worm, i) => {
         const head = worm.segments[0];
         const hitOther = this.worms.some((other, j) => i !== j && other.segments.some(seg => seg.x === head.x && seg.y === head.y));
@@ -206,12 +214,14 @@ export default class Game {
       });
     }
 
+    // Scores alltid
     this.worms.forEach((worm, i) => {
       const score = (worm.segments.length - 1) % 1000;
       if (this.scoreEls[i]) this.scoreEls[i].textContent = score.toString().padStart(3, '0');
     });
 
-    if (this.isMultiplayer && this.isHost && this.frameCounter % 2 === 0) {
+    // FIX: Sync VARJE frame på host (minimal lag)
+    if (this.isMultiplayer && this.isHost) {
       try {
         this.api.transmit({ type: 'state', ...this.getFullState() });
       } catch (e) {
@@ -248,37 +258,46 @@ export default class Game {
     if (data.type === 'assign' && this.myPlayerIndex === -1) {
       this.myPlayerIndex = data.playerIndex;
       console.log('Client assigned playerIndex:', data.playerIndex);
-    } else if (data.type === 'state') {
-      this.timeLeft = data.timeLeft;
-      this.food = data.food ? new Food(this.cols, this.rows) : null;
-      if (this.food) this.food.pos = data.food;
-      this.powerup = data.powerup ? new Powerup(this.cols, this.rows) : null;
-      if (this.powerup) this.powerup.pos = data.powerup;
-      this.obstacles = data.obstacles;
-      data.worms.forEach(wState => {
-        let worm = this.worms.find(w => w.playerIndex === wState.playerIndex);
-        if (!worm) {
-          worm = new Worm(colors[wState.playerIndex % colors.length], 0, 0, wState.playerIndex);
-          this.worms.push(worm);
-        }
+      return;
+    }
+    if (data.type === 'state') {
+      // FIX: Snap ALL state (prediktion korrigeras)
+      this.timeLeft = data.timeLeft || this.timeLeft;
+      if (data.food) {
+        this.food = new Food(this.cols, this.rows);
+        this.food.pos = data.food;
+      }
+      if (data.powerup) {
+        this.powerup = new Powerup(this.cols, this.rows);
+        this.powerup.pos = data.powerup;
+      } else {
+        this.powerup = null;
+      }
+      this.obstacles = data.obstacles || [];
+
+      // Rebuild worms (snap)
+      this.worms = [];
+      (data.worms || []).forEach(wState => {
+        const worm = new Worm(colors[wState.playerIndex % colors.length], 0, 0, wState.playerIndex);
         worm.segments = wState.segments;
         worm.direction = wState.direction;
         worm.tongueShots = wState.tongueShots;
         worm.isShooting = wState.isShooting;
         worm.shootTimer = wState.shootTimer;
+        this.worms.push(worm);
       });
-      console.log('Client worms length after state:', this.worms.length);  // NY: Debug-log
-      this.drawAll();  // NY: Extra draw efter state för att säkerställa rendering
-    } else if (data.type === 'input' && this.isHost) {
+      return;
+    }
+    if (data.type === 'input' && this.isHost) {
       const worm = this.worms.find(w => w.playerIndex === data.playerIndex);
       if (worm) {
         if (data.direction && worm.direction !== this.opposite(data.direction)) {
           worm.direction = data.direction;
         }
         if (data.shoot) worm.shootTongue();
-        console.log('Host processing input for player', data.playerIndex, 'direction:', data.direction, 'shoot:', data.shoot);
       }
-    } else if (data.type === 'request_assign' && this.isHost) {
+    }
+    if (data.type === 'request_assign' && this.isHost) {
       const playerIndex = this.worms.length;
       const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
       const newWorm = new Worm(colors[playerIndex % colors.length], null, null, playerIndex);
@@ -286,7 +305,6 @@ export default class Game {
       this.worms.push(newWorm);
       this.api.transmit({ type: 'assign', playerIndex }, clientId);
       this.api.transmit({ type: 'state', ...this.getFullState() });
-      console.log('Assigned playerIndex', playerIndex, 'to client', clientId);
     }
   }
 
@@ -307,7 +325,7 @@ export default class Game {
   }
 
   drawWorms() {
-    console.log('Drawing worms, length:', this.worms.length);  // NY: Debug-log
+    // FIX: Borttagen spammig logg
     this.worms.forEach(worm => {
       worm.segments.forEach((segment, index) => {
         if (segment.x >= 0 && segment.x < this.cols && segment.y >= 0 && segment.y < this.rows) {
@@ -370,8 +388,10 @@ export default class Game {
     }
 
     this.ctx.fillStyle = '#EEEEEE';
+    this.ctx.font = '32px Silkscreen, sans-serif';
     this.ctx.fillText('Press enter to play again', this.canvas.width / 2, this.canvas.height / 2 + 130);
 
+    // Scoreboard för vinnare
     const finalScores = this.worms.map(w => ({ name: `Player ${w.playerIndex + 1}`, score: w.segments.length - 1 }));
     const maxScore = Math.max(...finalScores.map(s => s.score));
     const winnerName = finalScores.find(s => s.score === maxScore)?.name || 'Player 1';

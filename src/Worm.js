@@ -6,13 +6,10 @@ export default class Worm {
     this.tongueShots = 0;
     this.isShooting = false;
     this.shootTimer = 0;
-    this.segments = [
-      { x: startX || 5, y: startY || 5 },
-      { x: (startX || 5) - 1, y: startY || 5 }
-    ];  // NY: Start med 2 segment (huvud + 1 svans)
+    this.reset(startX, startY);  // Starta alltid med reset-logik (längd 2)
   }
 
-  move(isFullLogic, cols, rows) {
+  move(cols, rows) {  // FIX: Alltid full move, ingen isFullLogic här
     const head = { ...this.segments[0] };
     switch (this.direction) {
       case 'up': head.y--; break;
@@ -20,14 +17,6 @@ export default class Worm {
       case 'left': head.x--; break;
       case 'right': head.x++; break;
     }
-
-    // På klient (inte full logic), enkel bounds-check för att stoppa ut-åkning
-    if (!isFullLogic) {
-      if (head.x < 0 || head.x >= cols || head.y < 0 || head.y >= rows) {
-        return;  // Stoppa move - vänta på sync
-      }
-    }
-
     this.segments.unshift(head);
     this.segments.pop();
   }
@@ -35,30 +24,32 @@ export default class Worm {
   grow() {
     const tail = { ...this.segments[this.segments.length - 1] };
     this.segments.push(tail);
+    // Ljud: new Audio('grow.wav').play();
   }
 
-  reset(startX, startY, cols, rows, occupied) {
-    let x = startX || Math.floor(Math.random() * cols);
-    let y = startY || Math.floor(Math.random() * rows);
+  reset(startX, startY, cols = 34, rows = 17, occupied = []) {
+    let x = startX !== null ? startX : Math.floor(Math.random() * cols);
+    let y = startY !== null ? startY : Math.floor(Math.random() * rows);
     while (occupied.some(o => o.x === x && o.y === y)) {
       x = Math.floor(Math.random() * cols);
       y = Math.floor(Math.random() * rows);
     }
     this.segments = [
-      { x: x, y: y },
-      { x: x - 1, y: y }
+      { x, y },
+      { x: x - 1, y }  // Längd 2: huvud + svans
     ];
     this.direction = 'right';
     this.tongueShots = 0;
     this.isShooting = false;
     this.shootTimer = 0;
+    // Ljud: new Audio('reset.wav').play();
   }
 
   shootTongue() {
     if (this.tongueShots > 0 && !this.isShooting) {
       this.tongueShots--;
       this.isShooting = true;
-      this.shootTimer = 3;  // T.ex. 3 ticks lång tunga
+      this.shootTimer = 3;
     }
   }
 
@@ -74,7 +65,7 @@ export default class Worm {
   getTonguePositions(cols, rows) {
     const positions = [];
     let pos = { ...this.segments[0] };
-    for (let i = 0; i < 3; i++) {  // 3 rutor fram
+    for (let i = 0; i < 3; i++) {
       switch (this.direction) {
         case 'up': pos.y--; break;
         case 'down': pos.y++; break;

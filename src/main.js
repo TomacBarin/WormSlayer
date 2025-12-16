@@ -1,9 +1,9 @@
 import Game from './Game.js';
-import { mpapi } from './mpapi.js';  // NY: Från nya repo
+import { mpapi } from './mpapi.js';
 
 const canvas = document.getElementById('game-board');
 const game = new Game(canvas);
-const api = new mpapi('ws://localhost:8080/net', 'wormslayer');  // Fixed identifier!
+const api = new mpapi('ws://localhost:8080/net', 'wormslayer');
 
 // Keymaps för 4 spelare
 const keyMaps = [
@@ -40,15 +40,49 @@ document.addEventListener('keydown', (e) => {
   if (game.isRunning) {
     const key = e.key.toLowerCase();
     if (key === ' ') {  // Space skjuter tunga
-      if (!game.isMultiplayer || game.isHost) {
-        game.worms.forEach(worm => worm.shootTongue());
+      if (game.isMultiplayer) {
+        if (game.isHost) {
+          game.worms[0]?.shootTongue();  // Bara hostens
+        } else {
+          const myWorm = game.worms[game.myPlayerIndex];
+          if (myWorm) {
+            myWorm.shootTongue();  // Predict
+            game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
+          }
+        }
       } else {
-        console.log('Sending input: shoot');
-        game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
+        game.worms.forEach(worm => worm.shootTongue());
       }
       return;
     }
-    if (!game.isMultiplayer || game.isHost) {  // Hantera keys lokalt för host i multi
+
+    // Direction input
+    if (game.isMultiplayer) {
+      if (game.isHost) {
+        // Host: Bara player 0 keys
+        const map = keyMaps[0];
+        const worm = game.worms[0];
+        if (!worm) return;
+        if (key === map.up.toLowerCase() && worm.direction !== 'down') worm.direction = 'up';
+        if (key === map.down.toLowerCase() && worm.direction !== 'up') worm.direction = 'down';
+        if (key === map.left.toLowerCase() && worm.direction !== 'right') worm.direction = 'left';
+        if (key === map.right.toLowerCase() && worm.direction !== 'left') worm.direction = 'right';
+      } else {
+        // Klient: Predict local + transmit
+        const map = keyMaps[game.myPlayerIndex] || keyMaps[1];
+        let direction = null;
+        if (key === map.up.toLowerCase()) direction = 'up';
+        if (key === map.down.toLowerCase()) direction = 'down';
+        if (key === map.left.toLowerCase()) direction = 'left';
+        if (key === map.right.toLowerCase()) direction = 'right';
+        const myWorm = game.worms[game.myPlayerIndex];
+        if (direction && myWorm && myWorm.direction !== game.opposite(direction)) {
+          myWorm.direction = direction;  // PREDICT!
+          game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, direction });
+        }
+      }
+    } else {
+      // Lokal: Alla keys
       keyMaps.forEach((map, i) => {
         const worm = game.worms[i];
         if (!worm) return;
@@ -57,17 +91,6 @@ document.addEventListener('keydown', (e) => {
         if (key === map.left.toLowerCase() && worm.direction !== 'right') worm.direction = 'left';
         if (key === map.right.toLowerCase() && worm.direction !== 'left') worm.direction = 'right';
       });
-    } else {  // Klient: Skicka input
-      let direction = null;
-      const map = keyMaps[game.myPlayerIndex] || keyMaps[0];
-      if (key === map.up.toLowerCase()) direction = 'up';
-      if (key === map.down.toLowerCase()) direction = 'down';
-      if (key === map.left.toLowerCase()) direction = 'left';
-      if (key === map.right.toLowerCase()) direction = 'right';
-      if (direction && game.worms[game.myPlayerIndex]?.direction !== game.opposite(direction)) {
-        console.log('Sending input: direction', direction);
-        game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, direction });
-      }
     }
   }
 });
@@ -110,7 +133,6 @@ async function startMultiplayer(isHost) {
 
   const unsubscribe = api.listen((event, messageId, clientId, data) => {
     if (event === 'game') {
-      console.log('Received game event with type:', data.type);
       game.processMessage(data, clientId);
       if (data.type === 'assign' && assignResolve) {
         assignResolve();
@@ -139,12 +161,12 @@ async function startMultiplayer(isHost) {
     const statePromise = new Promise(resolve => stateResolve = resolve);
 
     const sessionID = prompt('Ange Session ID:');
-    if (!sessionID) return; // Avbryt om tomt
+    if (!sessionID) return;
     const joinPromise = api.join(sessionID, { name: 'Guest' });
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 15000));
     Promise.race([joinPromise, timeoutPromise])
       .then(() => {
-        game.api.transmit({ type: 'request_assign' });  // Begär assign från host
+        game.api.transmit({ type: 'request_assign' });
         game.myPlayerIndex = -1;
         Promise.all([assignPromise, statePromise]).then(() => {
           game.start(true);
