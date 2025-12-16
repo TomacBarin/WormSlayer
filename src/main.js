@@ -13,13 +13,27 @@ const keyMaps = [
   { up: 'i', down: 'k', left: 'j', right: 'l' }                                     // P4: IJKL
 ];
 
+// Override drawTitleScreen med multiplayer-text
+game.drawTitleScreen = function() {
+  this.ctx.fillStyle = this.introBgColor;
+  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  this.ctx.textAlign = 'center';
+  this.ctx.textBaseline = 'middle';
+  this.ctx.font = '192px VT323, monospace';
+  this.ctx.fillStyle = '#2D2D2D';
+  this.ctx.fillText('WORM SLAYER', this.canvas.width / 2, this.canvas.height / 2 - 100);
+  this.ctx.font = '48px Silkscreen, sans-serif';
+  this.ctx.fillText('Enter: Local | H: Host Multi | J: Join Multi', this.canvas.width / 2, this.canvas.height / 2 + 100);
+};
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    if (!game.isRunning) {
-      game.start(false);
-    } else {
-      game.stop();
-      game.start(false);  // Restart local
+  if (!game.isRunning) {
+    if (e.key === 'Enter') {
+      game.start(false);  // Local
+    } else if (e.key.toLowerCase() === 'h') {
+      startMultiplayer(true);  // Host
+    } else if (e.key.toLowerCase() === 'j') {
+      startMultiplayer(false);  // Join
     }
     return;
   }
