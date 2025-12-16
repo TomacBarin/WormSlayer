@@ -73,7 +73,7 @@ drawTitleScreen() {
   this.ctx.fillStyle = '#2D2D2D';  // Samma mörka färg
   this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);  // Mer space ned
   this.ctx.font = '24px Silkscreen, sans-serif';
-  this.ctx.fillText('H: Host Multi | J: Join Multi', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
+  this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
 }
 
   drawGrid() {
