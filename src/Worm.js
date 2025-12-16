@@ -1,4 +1,4 @@
-// src/Worm.js - KOMPLETT (med shootTimer=18 för ~4s tunga)
+// src/Worm.js - Uppdaterad shootTimer för 400 BPM (~4s)
 export default class Worm {
   constructor(color, startX, startY, playerIndex) {
     this.color = color;
@@ -51,7 +51,7 @@ export default class Worm {
     if (this.tongueShots > 0 && !this.isShooting) {
       this.tongueShots--;
       this.isShooting = true;
-      this.shootTimer = 18;  // FIX: ~4s vid 240ms/tick (250 BPM)
+      this.shootTimer = 27;  // NY: ~4s vid 150ms/tick (400 BPM)
     }
   }
 

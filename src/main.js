@@ -148,6 +148,9 @@ async function startMultiplayer(isHost) {
       .catch(e => {
         console.error('Host error:', e);
         alert('Failed to host: ' + e);
+        // Pausa musik om fel
+        game.mainMusic.pause();
+        game.mainMusic.currentTime = 0;
       });
   } else {
     const assignPromise = new Promise(resolve => assignResolve = resolve);
@@ -166,11 +169,17 @@ async function startMultiplayer(isHost) {
         }).catch(e => {
           console.error('Sync timeout:', e);
           alert('Failed to sync with host: ' + e);
+          // Pausa musik om fel
+          game.mainMusic.pause();
+          game.mainMusic.currentTime = 0;
         });
       })
       .catch(e => {
         console.error('Join error:', e);
         alert('Failed to join: ' + e);
+        // Pausa musik om fel
+        game.mainMusic.pause();
+        game.mainMusic.currentTime = 0;
       });
   }
 }

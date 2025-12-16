@@ -23,7 +23,7 @@ export default class Game {
     this.api = null;
     this.myPlayerIndex = null;
     this.lastFrameTime = 0;
-    this.frameInterval = 240;  // 250 BPM = 240ms/tick
+    this.frameInterval = 150;  // NY: 400 BPM = 150ms/tick
     this.frameCounter = 0;
     this.worms = [];
     this.food = null;
@@ -36,6 +36,14 @@ export default class Game {
     this.scoreEls = [...document.querySelectorAll('.scoreContainer')].map(el => el.lastChild);
     this.updateOffsets();
     this.gameOverActive = false;
+
+    // Ladda ljudfiler
+    this.mainMusic = new Audio('assets/music/SquareCrawlMainMusic.ogg');
+    this.mainMusic.loop = true;
+    this.fxEatFood = 'assets/music/FX_EatFood.ogg';
+    this.fxPowerUp = 'assets/music/FX_PowerUp.ogg';
+    this.fxNewPower = 'assets/music/FX_NewPower.ogg';
+    this.fxMiss = 'assets/music/FX_Miss.ogg';
   }
 
   opposite(dir) {
@@ -51,30 +59,29 @@ export default class Game {
     this.offsetY = (512 - (this.rows * this.cellSize + (this.rows - 1) * this.gap)) / 2;
   }
 
-drawTitleScreen() {
-  this.ctx.fillStyle = this.introBgColor;
-  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  this.ctx.textAlign = 'center';
-  this.ctx.textBaseline = 'middle';
-  this.ctx.font = '192px VT323, monospace';
-  this.ctx.fillStyle = '#2D2D2D';
-  this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 140);  // Lite mer space upp
-  this.ctx.fillText('CRAWLER', this.canvas.width / 2, this.canvas.height / 2 + 10);
+  drawTitleScreen() {
+    this.ctx.fillStyle = this.introBgColor;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.font = '192px VT323, monospace';
+    this.ctx.fillStyle = '#2D2D2D';
+    this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 140);
+    this.ctx.fillText('CRAWLER', this.canvas.width / 2, this.canvas.height / 2 + 10);
 
-  // Streck (linje) mellan titel och undertext
-  this.ctx.strokeStyle = '#2D2D2D';
-  this.ctx.lineWidth = 2;  // Tjocklek på strecket
-  this.ctx.beginPath();
-  this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 95);  // Start vänster
-  this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 95);  // Slut höger
-  this.ctx.stroke();
+    this.ctx.strokeStyle = '#2D2D2D';
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 95);
+    this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 95);
+    this.ctx.stroke();
 
-  this.ctx.font = '36px Silkscreen, sans-serif';
-  this.ctx.fillStyle = '#2D2D2D';  // Samma mörka färg
-  this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);  // Mer space ned
-  this.ctx.font = '24px Silkscreen, sans-serif';
-  this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
-}
+    this.ctx.font = '36px Silkscreen, sans-serif';
+    this.ctx.fillStyle = '#2D2D2D';
+    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);
+    this.ctx.font = '24px Silkscreen, sans-serif';
+    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);
+  }
 
   drawGrid() {
     this.ctx.fillStyle = this.gameBgColor;
@@ -118,6 +125,9 @@ drawTitleScreen() {
     requestAnimationFrame(this.update.bind(this));
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
     this.scoreEls.forEach(el => el.textContent = '000');
+
+    // Spela bakgrundsmusik
+    this.mainMusic.play();
   }
 
   stop() {
@@ -128,6 +138,10 @@ drawTitleScreen() {
     this.stop();
     this.gameOverActive = false;
     this.drawTitleScreen();
+
+    // Pausa och återställ musik
+    this.mainMusic.pause();
+    this.mainMusic.currentTime = 0;
   }
 
   update(timestamp) {
@@ -148,207 +162,158 @@ drawTitleScreen() {
   updateLogic() {
     this.timeLeft--;
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
-
     if (this.timeLeft <= 0) {
       this.gameOver();
       return;
     }
 
-    const isFullLogic = this.isHost || !this.isMultiplayer;
-
-    this.worms.forEach(worm => {
-      worm.move(this.cols, this.rows);
-      worm.updateShoot();
-    });
-
-    this.powerupTimer++;
-    if (this.powerupTimer >= 75 && !this.powerup && isFullLogic) {
-      const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-      this.powerup = new Powerup(this.cols, this.rows, occupied);
-      this.powerupTimer = 0;
-    }
-
-    if (isFullLogic) {
-      this.foodEaten = false;
-      this.worms.forEach(worm => {
-        const head = worm.segments[0];
-        const powerupPos = this.powerup ? this.powerup.pos : null;
-        const collision = worm.checkCollision(
-          head,
-          this.cols,
-          this.rows,
-          worm.segments,
-          this.food ? this.food.pos : null,
-          powerupPos,
-          this.obstacles
-        );
-        if (collision === 'wall' || collision === 'self' || collision === 'obstacle') {
-          const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-          worm.reset(null, null, this.cols, this.rows, occupied);
-        } else if (collision === 'food') {
-          worm.grow();
-          this.obstacles.push({ ...this.food.pos });
-          this.foodEaten = true;
-        } else if (collision === 'powerup') {
-          worm.tongueShots++;
-          this.powerup = null;
-          this.powerupTimer = 0;
+    if (this.isHost || !this.isMultiplayer) {
+      this.powerupTimer++;
+      // NY: Spawn/repone ny powerup var 67 ticks (~10s vid 150ms/tick), oavsett om en finns
+      if (this.powerupTimer >= 67) {
+        const occupied = this.getAllOccupied();
+        if (this.powerup) {
+          this.powerup.newPos(occupied);  // Repositionera befintlig
+        } else {
+          this.powerup = new Powerup(this.cols, this.rows, occupied);  // Skapa ny
         }
-      });
-
-      if (this.foodEaten) {
-        const occupied = this.worms.flatMap(w => w.segments).concat(this.obstacles);
-        this.food.newPos(occupied);
+        this.powerupTimer = 0;
+        new Audio(this.fxNewPower).play();  // FX alltid vid spawn/reposition
       }
 
-      this.worms.forEach(worm => {
+      this.worms.forEach((worm, index) => {
+        worm.updateShoot();
+        const head = { ...worm.segments[0] };
+        worm.move(this.cols, this.rows);
+        const collision = worm.checkCollision(worm.segments[0], this.cols, this.rows, worm.segments, this.food?.pos, this.powerup?.pos, this.obstacles);
+
+        if (collision === 'food') {
+          worm.grow();
+          this.obstacles.push({ ...head });
+          const occupied = this.getAllOccupied();
+          this.food.newPos(occupied);
+          this.foodEaten = true;
+          new Audio(this.fxEatFood).play();
+        } else if (collision === 'powerup') {
+          worm.tongueShots++;
+          // NY: Ta bort powerup helt efter ätning (istället för newPos) – ny spawnas via timer
+          this.powerup = null;
+          new Audio(this.fxPowerUp).play();
+        } else if (collision === 'wall' || collision === 'self' || collision === 'obstacle') {
+          const occupied = this.getAllOccupied();
+          worm.reset(null, null, this.cols, this.rows, occupied);
+          new Audio(this.fxMiss).play();
+        }
+
         if (worm.isShooting) {
           const tonguePos = worm.getTonguePositions(this.cols, this.rows);
           tonguePos.forEach(pos => {
-            this.worms.forEach(other => {
-              if (other !== worm && other.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
-                const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-                other.reset(null, null, this.cols, this.rows, occupied);
+            this.worms.forEach((otherWorm, otherIndex) => {
+              if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
+                const occupied = this.getAllOccupied();
+                otherWorm.reset(null, null, this.cols, this.rows, occupied);
+                new Audio(this.fxMiss).play();
               }
             });
             const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
-            if (obsIndex > -1) {
+            if (obsIndex !== -1) {
               this.obstacles.splice(obsIndex, 1);
             }
           });
         }
+
+        this.scoreEls[index].textContent = ((worm.segments.length - 1) % 1000).toString().padStart(3, '0');
       });
 
-      this.worms.forEach((worm, i) => {
-        const head = worm.segments[0];
-        const hitOther = this.worms.some((other, j) => i !== j && other.segments.some(seg => seg.x === head.x && seg.y === head.y));
-        if (hitOther) {
-          const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-          worm.reset(null, null, this.cols, this.rows, occupied);
-        }
-      });
-    }
-
-    this.worms.forEach((worm, i) => {
-      const score = (worm.segments.length - 1) % 1000;
-      if (this.scoreEls[i]) this.scoreEls[i].textContent = score.toString().padStart(3, '0');
-    });
-
-    if (this.isMultiplayer && this.isHost) {
-      try {
-        this.api.transmit({ type: 'state', ...this.getFullState() });
-      } catch (e) {
-        console.error('Transmit error:', e);
+      if (this.isMultiplayer && this.isHost) {
+        this.api.transmit({ type: 'state', worms: this.worms.map(w => ({ segments: w.segments, direction: w.direction, tongueShots: w.tongueShots, isShooting: w.isShooting, shootTimer: w.shootTimer })), food: this.food.pos, powerup: this.powerup?.pos, obstacles: this.obstacles, timeLeft: this.timeLeft });
       }
+    }
+  }
+
+  getAllOccupied() {
+    return [...this.worms.flatMap(w => w.segments), ...this.obstacles, this.food?.pos, this.powerup?.pos].filter(Boolean);
+  }
+
+  processMessage(data, clientId) {
+    if (data.type === 'input') {
+      const worm = this.worms[data.playerIndex];
+      if (worm) {
+        if (data.direction && worm.direction !== this.opposite(data.direction)) {
+          worm.direction = data.direction;
+        }
+        if (data.shoot) {
+          worm.shootTongue();
+        }
+      }
+    } else if (data.type === 'request_assign') {
+      const available = [1, 2, 3].find(i => !this.worms.some(w => w.playerIndex === i));
+      if (available) {
+        const startPositions = [{x:30,y:3}, {x:3,y:14}, {x:30,y:14}];
+        const pos = startPositions[available - 1];
+        const worm = new Worm(colors[available], pos.x, pos.y, available);
+        this.worms.push(worm);
+        this.api.transmit({ type: 'assign', playerIndex: available }, clientId);
+        this.api.transmit({ type: 'state', worms: this.worms.map(w => ({ segments: w.segments, direction: w.direction, tongueShots: w.tongueShots, isShooting: w.isShooting, shootTimer: w.shootTimer })), food: this.food.pos, powerup: this.powerup?.pos, obstacles: this.obstacles, timeLeft: this.timeLeft });
+      }
+    } else if (data.type === 'state') {
+      this.worms = data.worms.map((dw, i) => {
+        const color = colors[i];
+        let worm = this.worms[i] || new Worm(color, null, null, i);
+        worm.segments = dw.segments;
+        worm.direction = dw.direction;
+        worm.tongueShots = dw.tongueShots;
+        worm.isShooting = dw.isShooting;
+        worm.shootTimer = dw.shootTimer;
+        return worm;
+      });
+      this.food = { pos: data.food };
+      this.powerup = data.powerup ? { pos: data.powerup } : null;
+      this.obstacles = data.obstacles;
+      this.timeLeft = data.timeLeft;
+      this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
+      this.scoreEls.forEach((el, i) => el.textContent = ((this.worms[i]?.segments.length - 1 || 0) % 1000).toString().padStart(3, '0'));
+    } else if (data.type === 'assign') {
+      this.myPlayerIndex = data.playerIndex;
+      this.worms[this.myPlayerIndex] = new Worm(colors[this.myPlayerIndex], null, null, this.myPlayerIndex);
     }
   }
 
   drawAll() {
     this.drawGrid();
-    if (this.food) this.drawFood();
-    if (this.powerup) this.drawPowerup();
-    this.drawWorms();
-  }
 
-  getFullState() {
-    return {
-      worms: this.worms.map(w => ({
-        playerIndex: w.playerIndex,
-        segments: w.segments.map(s => ({ x: s.x, y: s.y })),
-        direction: w.direction,
-        tongueShots: w.tongueShots,
-        isShooting: w.isShooting,
-        shootTimer: w.shootTimer
-      })),
-      food: this.food ? { x: this.food.pos.x, y: this.food.pos.y } : null,
-      powerup: this.powerup ? { x: this.powerup.pos.x, y: this.powerup.pos.y } : null,
-      obstacles: this.obstacles.map(o => ({ x: o.x, y: o.y })),
-      timeLeft: this.timeLeft
-    };
-  }
-
-  processMessage(data, clientId) {
-    if (data.type === 'assign' && this.myPlayerIndex === -1) {
-      this.myPlayerIndex = data.playerIndex;
-      console.log('Client assigned playerIndex:', data.playerIndex);
-      return;
+    if (this.food) {
+      const x = this.offsetX + this.food.pos.x * (this.cellSize + this.gap);
+      const y = this.offsetY + this.food.pos.y * (this.cellSize + this.gap);
+      this.ctx.fillStyle = '#FFFFFF';
+      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
     }
-    if (data.type === 'state') {
-      this.timeLeft = data.timeLeft || this.timeLeft;
-      if (data.food) {
-        this.food = new Food(this.cols, this.rows);
-        this.food.pos = data.food;
-      }
-      if (data.powerup) {
-        this.powerup = new Powerup(this.cols, this.rows);
-        this.powerup.pos = data.powerup;
-      } else {
-        this.powerup = null;
-      }
-      this.obstacles = data.obstacles || [];
 
-      this.worms = [];
-      (data.worms || []).forEach(wState => {
-        const worm = new Worm(colors[wState.playerIndex % colors.length], 0, 0, wState.playerIndex);
-        worm.segments = wState.segments;
-        worm.direction = wState.direction;
-        worm.tongueShots = wState.tongueShots;
-        worm.isShooting = wState.isShooting;
-        worm.shootTimer = wState.shootTimer;
-        this.worms.push(worm);
-      });
-      return;
+    if (this.powerup) {
+      const x = this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap);
+      const y = this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap);
+      this.ctx.fillStyle = '#FFA500';
+      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
     }
-    if (data.type === 'input' && this.isHost) {
-      const worm = this.worms.find(w => w.playerIndex === data.playerIndex);
-      if (worm) {
-        if (data.direction && worm.direction !== this.opposite(data.direction)) {
-          worm.direction = data.direction;
-        }
-        if (data.shoot) worm.shootTongue();
-      }
-    }
-    if (data.type === 'request_assign' && this.isHost) {
-      const playerIndex = this.worms.length;
-      const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-      const newWorm = new Worm(colors[playerIndex % colors.length], null, null, playerIndex);
-      newWorm.reset(null, null, this.cols, this.rows, occupied);
-      this.worms.push(newWorm);
-      this.api.transmit({ type: 'assign', playerIndex }, clientId);
-      this.api.transmit({ type: 'state', ...this.getFullState() });
-    }
-  }
 
-  drawPowerup() {
-    if (!this.powerup) return;
-    const x = this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap);
-    const y = this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap);
-    this.ctx.fillStyle = '#F39420';
-    this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-  }
+    this.obstacles.forEach(obs => {
+      const x = this.offsetX + obs.x * (this.cellSize + this.gap);
+      const y = this.offsetY + obs.y * (this.cellSize + this.gap);
+      this.ctx.fillStyle = this.obstacleColor;
+      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+    });
 
-  drawFood() {
-    if (!this.food) return;
-    const x = this.offsetX + this.food.pos.x * (this.cellSize + this.gap);
-    const y = this.offsetY + this.food.pos.y * (this.cellSize + this.gap);
-    this.ctx.fillStyle = '#EEEEEE';
-    this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-  }
-
-  drawWorms() {
     this.worms.forEach(worm => {
       worm.segments.forEach((segment, index) => {
-        if (segment.x >= 0 && segment.x < this.cols && segment.y >= 0 && segment.y < this.rows) {
-          const x = this.offsetX + segment.x * (this.cellSize + this.gap);
-          const y = this.offsetY + segment.y * (this.cellSize + this.gap);
-          this.ctx.fillStyle = worm.color;
-          if (index === 0) {
-            this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-          } else {
-            const tailSize = Math.round(this.cellSize * 0.6);
-            const tailOffset = (this.cellSize - tailSize) / 2;
-            this.ctx.fillRect(x + tailOffset, y + tailOffset, tailSize, tailSize);
-          }
+        const x = this.offsetX + segment.x * (this.cellSize + this.gap);
+        const y = this.offsetY + segment.y * (this.cellSize + this.gap);
+        this.ctx.fillStyle = worm.color;
+        if (index === 0) {
+          this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+        } else {
+          const tailSize = Math.round(this.cellSize * 0.6);
+          const tailOffset = (this.cellSize - tailSize) / 2;
+          this.ctx.fillRect(x + tailOffset, y + tailOffset, tailSize, tailSize);
         }
       });
 
@@ -438,5 +403,9 @@ drawTitleScreen() {
       document.body.removeChild(popup);
       this.resetToTitle();
     };
+
+    // Pausa och återställ musik vid game over
+    this.mainMusic.pause();
+    this.mainMusic.currentTime = 0;
   }
 }
