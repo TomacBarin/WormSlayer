@@ -395,28 +395,30 @@ export default class Game {
         </div>
         <input id="winnerName" type="text" placeholder="Ditt namn för highscore..." 
                style="font-family: VT323; font-size: 32px; padding: 16px; background: #646464; color: #EEEEEE; border: 2px solid #19E9FF; width: 80%; margin-bottom: 32px;">
-        <button id="saveScore" style="padding: 16px 32px; font-size: 32px; background: #F39420; border: none; cursor: pointer; margin-right: 16px;">Save & Close</button>
+        <button id="saveScore" style="padding: 16px 32px; font-size: 32px; background: #F39420; border: none; cursor: pointer; margin-right: 16px;">Save</button>
         <button id="closeNoSave" style="padding: 16px 32px; font-size: 32px; background: #646464; border: none; cursor: pointer;">Close</button>
         <div id="highScores" style="margin-top: 32px; font-size: 24px;"></div>
       </div>
     `;
     document.body.appendChild(popup);
 
-    Scoreboard.renderHighScoresOnly(document.getElementById('highScores'));
+    const highScoresDiv = document.getElementById('highScores');
+    Scoreboard.renderHighScoresOnly(highScoresDiv);
 
-    document.getElementById('saveScore').onclick = () => {
+    const saveButton = document.getElementById('saveScore');
+    saveButton.onclick = () => {
       const name = document.getElementById('winnerName').value.trim() || `Player ${finalScores.findIndex(s => s.score === maxScore) + 1}`;
       Scoreboard.add(name, maxScore);
-      document.body.removeChild(popup);
-      this.resetToTitle();
+      // Uppdatera listan direkt efter save
+      Scoreboard.renderHighScoresOnly(highScoresDiv);
+      // Inaktivera knappen efter save
+      saveButton.disabled = true;
+      saveButton.style.background = '#646464';
+      saveButton.style.cursor = 'not-allowed';
     };
     document.getElementById('closeNoSave').onclick = () => {
       document.body.removeChild(popup);
       this.resetToTitle();
     };
-
-    // Pausa och återställ musik vid game over
-    this.mainMusic.pause();
-    this.mainMusic.currentTime = 0;
   }
 }
