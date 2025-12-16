@@ -3,7 +3,7 @@ import { mpapi } from './mpapi.js';  // NY: Från nya repo
 
 const canvas = document.getElementById('game-board');
 const game = new Game(canvas);
-const api = new mpapi('ws://localhost:8080/net', crypto.randomUUID());  // Korrigerad URL med /net!
+const api = new mpapi('ws://localhost:8080/net', 'wormslayer');  // Fixed identifier!
 
 // Keymaps för 4 spelare
 const keyMaps = [
@@ -47,7 +47,7 @@ document.addEventListener('keydown', (e) => {
       }
       return;
     }
-    if (!game.isMultiplayer || game.isHost) {  // Fix: Hantera keys lokalt för host i multi
+    if (!game.isMultiplayer || game.isHost) {  // Hantera keys lokalt för host i multi
       keyMaps.forEach((map, i) => {
         const worm = game.worms[i];
         if (!worm) return;
@@ -106,7 +106,9 @@ async function startMultiplayer(isHost) {
   game.lastMessageId = -1;
 
   const unsubscribe = api.listen((event, messageId, clientId, data) => {
+    console.log('Received event:', event, 'with data:', data);
     if (event === 'joined') {
+      console.log('Joined event on host from clientId:', clientId);
       if (game.isHost) {
         const playerIndex = game.worms.length;
         const occupied = game.obstacles.concat(game.worms.flatMap(w => w.segments));
@@ -115,14 +117,22 @@ async function startMultiplayer(isHost) {
         game.worms.push(newWorm);
         game.api.transmit({ type: 'assign', playerIndex }, clientId);
         game.api.transmit({ type: 'state', ...game.getFullState() });
+        console.log('Sent assign and state to new client');
       }
     } else if (event === 'game') {
+      console.log('Received game event with type:', data.type);
       game.messageBuffer.push({ messageId, data });
       game.messageBuffer.sort((a, b) => a.messageId - b.messageId);
       while (game.messageBuffer.length && game.messageBuffer[0].messageId === game.lastMessageId + 1) {
         const msg = game.messageBuffer.shift();
         game.lastMessageId = msg.messageId;
         game.processMessage(msg.data);
+        if (msg.data.type === 'assign') {
+          assignResolve();
+        }
+        if (msg.data.type === 'state') {
+          stateResolve();
+        }
       }
     }
   });
@@ -141,14 +151,29 @@ async function startMultiplayer(isHost) {
         alert('Failed to host: ' + e);
       });
   } else {
+    let assignResolve, stateResolve;
+    const assignPromise = new Promise((resolve, reject) => {
+      assignResolve = resolve;
+      setTimeout(() => reject('Timeout waiting for assign'), 5000);
+    });
+    const statePromise = new Promise((resolve, reject) => {
+      stateResolve = resolve;
+      setTimeout(() => reject('Timeout waiting for state'), 5000);
+    });
+
     const sessionID = prompt('Ange Session ID:');
     if (!sessionID) return; // Avbryt om tomt
     const joinPromise = api.join(sessionID, { name: 'Guest' });
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 5000));
     Promise.race([joinPromise, timeoutPromise])
       .then(() => {
-        game.myPlayerIndex = -1;  // Vänta på assign
-        game.start(true);
+        game.myPlayerIndex = -1;  // Vänta på assign och state
+        Promise.all([assignPromise, statePromise]).then(() => {
+          game.start(true);
+        }).catch(e => {
+          console.error('Sync timeout:', e);
+          alert('Failed to sync with host: ' + e);
+        });
       })
       .catch(e => {
         console.error('Join error:', e);
