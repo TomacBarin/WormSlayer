@@ -1,9 +1,10 @@
+// src/main.js - KOMPLETT (med Enter på gameOver + font ready-fix)
 import Game from './Game.js';
 import { mpapi } from './mpapi.js';
 
 const canvas = document.getElementById('game-board');
 const game = new Game(canvas);
-const api = new mpapi('ws://localhost:8080/net', 'wormslayer');
+const api = new mpapi('ws://localhost:8080/net', 'squarecrawler');  // Uppdaterat ID för nytt namn
 
 // Keymaps för 4 spelare
 const keyMaps = [
@@ -13,21 +14,13 @@ const keyMaps = [
   { up: 'i', down: 'k', left: 'j', right: 'l' }                                     // P4: IJKL
 ];
 
-// Override drawTitleScreen med multiplayer-text
-game.drawTitleScreen = function() {
-  this.ctx.fillStyle = this.introBgColor;
-  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  this.ctx.textAlign = 'center';
-  this.ctx.textBaseline = 'middle';
-  this.ctx.font = '192px VT323, monospace';
-  this.ctx.fillStyle = '#2D2D2D';
-  this.ctx.fillText('WORM SLAYER', this.canvas.width / 2, this.canvas.height / 2 - 100);
-  this.ctx.font = '48px Silkscreen, sans-serif';
-  this.ctx.fillText('Enter: Local | H: Host Multi | J: Join Multi', this.canvas.width / 2, this.canvas.height / 2 + 100);
-};
-
 document.addEventListener('keydown', (e) => {
-  if (!game.isRunning) {
+  // NY: Enter startar nytt också på gameOver
+  if (game.gameOverActive && e.key === 'Enter') {
+    game.resetToTitle();
+    return;
+  }
+  if (!game.isRunning && !game.gameOverActive) {
     if (e.key === 'Enter') {
       game.start(false);  // Local
     } else if (e.key.toLowerCase() === 'h') {
@@ -110,7 +103,7 @@ infoBtn.addEventListener('click', () => {
       <p style="font-size: 28px; line-height: 1.4;">
         • Styr din mask med pilar/WASD/TFGH/IJKL.<br>
         • Ät vit mat → växt + poäng + mörkt hål (farligt!).<br>
-        • Ät aqua-ruta (var 10s) → +1 tungskott.<br>
+        • Ät orange-ruta (var 10s) → +1 tungskott.<br>
         • Space skjuter tunga (3 rutor fram, för alla!).<br>
         • Tunga dödar fiende eller fyller hål inom räckvidd.<br>
         • Krock vägg/kropp/hål/annan mask → reset (längd 2).<br>
@@ -144,7 +137,7 @@ async function startMultiplayer(isHost) {
   });
 
   if (isHost) {
-    const hostPromise = api.host({ name: 'WormSlayer', private: false });
+    const hostPromise = api.host({ name: 'SquareCrawler', private: false });
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 15000));
     Promise.race([hostPromise, timeoutPromise])
       .then(({ session }) => {
@@ -182,6 +175,7 @@ async function startMultiplayer(isHost) {
   }
 }
 
-const colors = ['#19E9FF', '#FF2B6F', '#FFF034', '#FF94A6'];
-
-game.drawTitleScreen();
+// NY: Vänta på fonts innan title (fix incognito)
+document.fonts.ready.then(() => {
+  game.drawTitleScreen();
+});

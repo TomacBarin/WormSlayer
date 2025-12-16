@@ -23,7 +23,7 @@ export default class Game {
     this.api = null;
     this.myPlayerIndex = null;
     this.lastFrameTime = 0;
-    this.frameInterval = 66;  // FIX: ~15 FPS för bättre känsla (120 BPM-syncbart)
+    this.frameInterval = 240;  // 250 BPM = 240ms/tick
     this.frameCounter = 0;
     this.worms = [];
     this.food = null;
@@ -35,6 +35,7 @@ export default class Game {
     this.timerEl = document.getElementById('timer');
     this.scoreEls = [...document.querySelectorAll('.scoreContainer')].map(el => el.lastChild);
     this.updateOffsets();
+    this.gameOverActive = false;
   }
 
   opposite(dir) {
@@ -57,9 +58,13 @@ export default class Game {
     this.ctx.textBaseline = 'middle';
     this.ctx.font = '192px VT323, monospace';
     this.ctx.fillStyle = '#2D2D2D';
-    this.ctx.fillText('WORM SLAYER', this.canvas.width / 2, this.canvas.height / 2 - 60);
-    this.ctx.font = '48px Silkscreen, sans-serif';
-    this.ctx.fillText('Press enter to play', this.canvas.width / 2, this.canvas.height / 2 + 70);
+    this.ctx.fillText('SQUARE', this.canvas.width / 2, this.canvas.height / 2 - 80);
+    this.ctx.fillText('CRAWLER', this.canvas.width / 2, this.canvas.height / 2 - 20);
+    this.ctx.font = '36px Silkscreen, sans-serif';
+    this.ctx.fillStyle = '#EEEEEE';
+    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 60);
+    this.ctx.font = '24px Silkscreen, sans-serif';
+    this.ctx.fillText('H: Host Multi | J: Join Multi', this.canvas.width / 2, this.canvas.height / 2 + 100);
   }
 
   drawGrid() {
@@ -82,6 +87,7 @@ export default class Game {
   start(isMulti = false) {
     this.isMultiplayer = isMulti;
     this.isRunning = true;
+    this.gameOverActive = false;
     this.timeLeft = 999;
     this.obstacles = [];
     this.powerupTimer = 0;
@@ -107,6 +113,12 @@ export default class Game {
 
   stop() {
     this.isRunning = false;
+  }
+
+  resetToTitle() {
+    this.stop();
+    this.gameOverActive = false;
+    this.drawTitleScreen();
   }
 
   update(timestamp) {
@@ -135,13 +147,11 @@ export default class Game {
 
     const isFullLogic = this.isHost || !this.isMultiplayer;
 
-    // FIX: ALLTID move alla worms (prediktion på klient)
     this.worms.forEach(worm => {
       worm.move(this.cols, this.rows);
       worm.updateShoot();
     });
 
-    // FIX: Powerup spawn bara på host/lokal
     this.powerupTimer++;
     if (this.powerupTimer >= 75 && !this.powerup && isFullLogic) {
       const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
@@ -149,7 +159,6 @@ export default class Game {
       this.powerupTimer = 0;
     }
 
-    // FIX: Collision/logic GROW/FOOD/RESET bara på host/lokal
     if (isFullLogic) {
       this.foodEaten = false;
       this.worms.forEach(worm => {
@@ -171,7 +180,6 @@ export default class Game {
           worm.grow();
           this.obstacles.push({ ...this.food.pos });
           this.foodEaten = true;
-          // Ljud här: new Audio('eat.wav').play();
         } else if (collision === 'powerup') {
           worm.tongueShots++;
           this.powerup = null;
@@ -184,7 +192,6 @@ export default class Game {
         this.food.newPos(occupied);
       }
 
-      // Tunga-effekter bara på host
       this.worms.forEach(worm => {
         if (worm.isShooting) {
           const tonguePos = worm.getTonguePositions(this.cols, this.rows);
@@ -203,7 +210,6 @@ export default class Game {
         }
       });
 
-      // Mask-mot-mask kollision
       this.worms.forEach((worm, i) => {
         const head = worm.segments[0];
         const hitOther = this.worms.some((other, j) => i !== j && other.segments.some(seg => seg.x === head.x && seg.y === head.y));
@@ -214,13 +220,11 @@ export default class Game {
       });
     }
 
-    // Scores alltid
     this.worms.forEach((worm, i) => {
       const score = (worm.segments.length - 1) % 1000;
       if (this.scoreEls[i]) this.scoreEls[i].textContent = score.toString().padStart(3, '0');
     });
 
-    // FIX: Sync VARJE frame på host (minimal lag)
     if (this.isMultiplayer && this.isHost) {
       try {
         this.api.transmit({ type: 'state', ...this.getFullState() });
@@ -261,7 +265,6 @@ export default class Game {
       return;
     }
     if (data.type === 'state') {
-      // FIX: Snap ALL state (prediktion korrigeras)
       this.timeLeft = data.timeLeft || this.timeLeft;
       if (data.food) {
         this.food = new Food(this.cols, this.rows);
@@ -275,7 +278,6 @@ export default class Game {
       }
       this.obstacles = data.obstacles || [];
 
-      // Rebuild worms (snap)
       this.worms = [];
       (data.worms || []).forEach(wState => {
         const worm = new Worm(colors[wState.playerIndex % colors.length], 0, 0, wState.playerIndex);
@@ -312,7 +314,7 @@ export default class Game {
     if (!this.powerup) return;
     const x = this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap);
     const y = this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap);
-    this.ctx.fillStyle = '#5CFFE8';
+    this.ctx.fillStyle = '#F39420';
     this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
   }
 
@@ -325,7 +327,6 @@ export default class Game {
   }
 
   drawWorms() {
-    // FIX: Borttagen spammig logg
     this.worms.forEach(worm => {
       worm.segments.forEach((segment, index) => {
         if (segment.x >= 0 && segment.x < this.cols && segment.y >= 0 && segment.y < this.rows) {
@@ -365,6 +366,8 @@ export default class Game {
 
   gameOver() {
     this.stop();
+    this.gameOverActive = true;
+
     this.ctx.fillStyle = this.gameBgColor;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.textAlign = 'center';
@@ -377,9 +380,7 @@ export default class Game {
       const winner = this.worms.reduce((win, w) => {
         const winLen = win.segments.length;
         const wLen = w.segments.length;
-        if (wLen > winLen || (wLen === winLen && w.playerIndex < win.playerIndex)) {
-          return w;
-        }
+        if (wLen > winLen || (wLen === winLen && w.playerIndex < win.playerIndex)) return w;
         return win;
       }, this.worms[0]);
       this.ctx.font = '48px Silkscreen, sans-serif';
@@ -389,23 +390,44 @@ export default class Game {
 
     this.ctx.fillStyle = '#EEEEEE';
     this.ctx.font = '32px Silkscreen, sans-serif';
-    this.ctx.fillText('Press enter to play again', this.canvas.width / 2, this.canvas.height / 2 + 130);
+    this.ctx.fillText('Press Enter to play again', this.canvas.width / 2, this.canvas.height / 2 + 130);
 
-    // Scoreboard för vinnare
-    const finalScores = this.worms.map(w => ({ name: `Player ${w.playerIndex + 1}`, score: w.segments.length - 1 }));
+    const finalScores = this.worms.map(w => ({ name: `Player ${w.playerIndex + 1}`, score: (w.segments.length - 1) % 1000 }));
     const maxScore = Math.max(...finalScores.map(s => s.score));
-    const winnerName = finalScores.find(s => s.score === maxScore)?.name || 'Player 1';
-    const name = prompt('Ditt namn för highscore? (för vinnaren)');
-    if (name) Scoreboard.add(name, maxScore);
-    else Scoreboard.add(winnerName, maxScore);
 
-    const sbContainer = document.createElement('div');
-    sbContainer.style.cssText = `
+    const popup = document.createElement('div');
+    popup.id = 'gameOverPopup';
+    popup.style.cssText = `
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
       background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; 
-      z-index: 1000;
+      z-index: 1000; font-family: VT323, monospace; color: #EEEEEE; padding: 64px; box-sizing: border-box;
     `;
-    Scoreboard.render(sbContainer);
-    document.body.appendChild(sbContainer);
+    popup.innerHTML = `
+      <div style="background: #484848; padding: 48px; max-width: 80%; max-height: 80%; overflow: auto; border: 4px solid #646464; text-align: center;">
+        <h1 style="font-size: 64px; margin-bottom: 32px;">GAME OVER</h1>
+        <div style="font-size: 48px; margin-bottom: 32px; color: ${finalScores.find(s => s.score === maxScore)?.color || '#19E9FF'};">
+          WINNER: Player ${finalScores.findIndex(s => s.score === maxScore) + 1} (${maxScore} pts)
+        </div>
+        <input id="winnerName" type="text" placeholder="Ditt namn för highscore..." 
+               style="font-family: VT323; font-size: 32px; padding: 16px; background: #646464; color: #EEEEEE; border: 2px solid #19E9FF; width: 80%; margin-bottom: 32px;">
+        <button id="saveScore" style="padding: 16px 32px; font-size: 32px; background: #F39420; border: none; cursor: pointer; margin-right: 16px;">Save & Close</button>
+        <button id="closeNoSave" style="padding: 16px 32px; font-size: 32px; background: #646464; border: none; cursor: pointer;">Close</button>
+        <div id="highScores" style="margin-top: 32px; font-size: 24px;"></div>
+      </div>
+    `;
+    document.body.appendChild(popup);
+
+    Scoreboard.renderHighScoresOnly(document.getElementById('highScores'));
+
+    document.getElementById('saveScore').onclick = () => {
+      const name = document.getElementById('winnerName').value.trim() || `Player ${finalScores.findIndex(s => s.score === maxScore) + 1}`;
+      Scoreboard.add(name, maxScore);
+      document.body.removeChild(popup);
+      this.resetToTitle();
+    };
+    document.getElementById('closeNoSave').onclick = () => {
+      document.body.removeChild(popup);
+      this.resetToTitle();
+    };
   }
 }

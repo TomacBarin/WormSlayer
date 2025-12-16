@@ -1,3 +1,4 @@
+// src/Worm.js - KOMPLETT (med shootTimer=18 för ~4s tunga)
 export default class Worm {
   constructor(color, startX, startY, playerIndex) {
     this.color = color;
@@ -6,10 +7,11 @@ export default class Worm {
     this.tongueShots = 0;
     this.isShooting = false;
     this.shootTimer = 0;
+    this.segments = [];  // Tom – fylls i reset()
     this.reset(startX, startY);  // Starta alltid med reset-logik (längd 2)
   }
 
-  move(cols, rows) {  // FIX: Alltid full move, ingen isFullLogic här
+  move(cols, rows) {
     const head = { ...this.segments[0] };
     switch (this.direction) {
       case 'up': head.y--; break;
@@ -24,7 +26,7 @@ export default class Worm {
   grow() {
     const tail = { ...this.segments[this.segments.length - 1] };
     this.segments.push(tail);
-    // Ljud: new Audio('grow.wav').play();
+    // Ljud: new Audio('eat.wav').play();  // Lägg till senare
   }
 
   reset(startX, startY, cols = 34, rows = 17, occupied = []) {
@@ -49,7 +51,7 @@ export default class Worm {
     if (this.tongueShots > 0 && !this.isShooting) {
       this.tongueShots--;
       this.isShooting = true;
-      this.shootTimer = 3;
+      this.shootTimer = 18;  // FIX: ~4s vid 240ms/tick (250 BPM)
     }
   }
 
@@ -65,7 +67,7 @@ export default class Worm {
   getTonguePositions(cols, rows) {
     const positions = [];
     let pos = { ...this.segments[0] };
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 3; i++) {  // 3 rutor fram
       switch (this.direction) {
         case 'up': pos.y--; break;
         case 'down': pos.y++; break;
