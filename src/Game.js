@@ -3,6 +3,8 @@ import Food from './Food.js';
 import Powerup from './Powerup.js';
 import Scoreboard from './Scoreboard.js';
 
+const colors = ['#19E9FF', '#FF2B6F', '#FFF034', '#FF94A6'];
+
 export default class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -20,8 +22,9 @@ export default class Game {
     this.isHost = false;
     this.api = null;
     this.myPlayerIndex = null;
-    this.messageBuffer = [];
-    this.lastMessageId = -1;
+    this.lastFrameTime = 0;
+    this.frameInterval = 100;  // ~10 updates/sec
+    this.frameCounter = 0;
     this.worms = [];
     this.food = null;
     this.powerup = null;
@@ -29,10 +32,16 @@ export default class Game {
     this.foodEaten = false;
     this.obstacles = [];
     this.timeLeft = 999;
-    this.tickInterval = null;
     this.timerEl = document.getElementById('timer');
     this.scoreEls = [...document.querySelectorAll('.scoreContainer')].map(el => el.lastChild);
     this.updateOffsets();
+  }
+
+  opposite(dir) {
+    if (dir === 'up') return 'down';
+    if (dir === 'down') return 'up';
+    if (dir === 'left') return 'right';
+    if (dir === 'right') return 'left';
   }
 
   updateOffsets() {
@@ -88,20 +97,33 @@ export default class Game {
     } else {
       this.worms = [];
     }
-    this.tickInterval = setInterval(this.update.bind(this), 132);
-    this.update();
+    this.lastFrameTime = performance.now();
+    this.frameCounter = 0;
+    requestAnimationFrame(this.update.bind(this));  // NY: Starta rAF
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
     this.scoreEls.forEach(el => el.textContent = '000');
   }
 
   stop() {
-    if (this.tickInterval) clearInterval(this.tickInterval);
     this.isRunning = false;
   }
 
-  update() {
+  update(timestamp) {
     if (!this.isRunning) return;
 
+    const delta = timestamp - this.lastFrameTime;
+    if (delta >= this.frameInterval) {
+      this.lastFrameTime = timestamp - (delta % this.frameInterval);
+      this.updateLogic();
+      this.frameCounter++;
+    }
+
+    this.drawAll();
+
+    requestAnimationFrame(this.update.bind(this));
+  }
+
+  updateLogic() {
     this.timeLeft--;
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
 
@@ -110,18 +132,19 @@ export default class Game {
       return;
     }
 
-    if (this.isHost || !this.isMultiplayer) {
-      // Host eller local: Full spel-logik
-      this.foodEaten = false;
-      this.powerupTimer++;
-      if (this.powerupTimer >= 75 && !this.powerup) {
-        const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
-        this.powerup = new Powerup(this.cols, this.rows, occupied);
-        this.powerupTimer = 0;
-      }
+    const isFullLogic = this.isHost || !this.isMultiplayer;
 
-      this.worms.forEach(worm => {
-        worm.move();
+    this.foodEaten = false;
+    this.powerupTimer++;
+    if (this.powerupTimer >= 75 && !this.powerup && isFullLogic) {
+      const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
+      this.powerup = new Powerup(this.cols, this.rows, occupied);
+      this.powerupTimer = 0;
+    }
+
+    this.worms.forEach(worm => {
+      worm.move(isFullLogic, this.cols, this.rows);
+      if (isFullLogic) {
         const head = worm.segments[0];
         const powerupPos = this.powerup ? this.powerup.pos : null;
         const collision = worm.checkCollision(
@@ -145,15 +168,16 @@ export default class Game {
           this.powerup = null;
           this.powerupTimer = 0;
         }
-
-        worm.updateShoot();
-      });
-
-      if (this.foodEaten) {
-        const occupied = this.worms.flatMap(w => w.segments).concat(this.obstacles);
-        this.food.newPos(occupied);
       }
+      worm.updateShoot();
+    });
 
+    if (this.foodEaten && isFullLogic) {
+      const occupied = this.worms.flatMap(w => w.segments).concat(this.obstacles);
+      this.food.newPos(occupied);
+    }
+
+    if (isFullLogic) {
       this.worms.forEach(worm => {
         if (worm.isShooting) {
           const tonguePos = worm.getTonguePositions(this.cols, this.rows);
@@ -180,32 +204,27 @@ export default class Game {
           worm.reset(null, null, this.cols, this.rows, occupied);
         }
       });
-    } else {
-      // Klient: Bara predictera min worm
-      if (this.myPlayerIndex !== null && this.worms[this.myPlayerIndex]) {
-        this.worms[this.myPlayerIndex].move();
-        this.worms[this.myPlayerIndex].updateShoot();
-      }
-      this.timeLeft--;
     }
-
-    this.drawGrid();
-    if (this.food) this.drawFood();
-    if (this.powerup) this.drawPowerup();
-    this.drawWorms();
 
     this.worms.forEach((worm, i) => {
       const score = (worm.segments.length - 1) % 1000;
       if (this.scoreEls[i]) this.scoreEls[i].textContent = score.toString().padStart(3, '0');
     });
 
-    if (this.isMultiplayer && this.isHost) {
+    if (this.isMultiplayer && this.isHost && this.frameCounter % 2 === 0) {
       try {
-        this.api.transmit({ type: 'state', ...this.getFullState() });  // Fix: transmit istället för game
+        this.api.transmit({ type: 'state', ...this.getFullState() });
       } catch (e) {
-        console.error('Transmit error:', e);  // Fånga errors för att undvika spam
+        console.error('Transmit error:', e);
       }
     }
+  }
+
+  drawAll() {
+    this.drawGrid();
+    if (this.food) this.drawFood();
+    if (this.powerup) this.drawPowerup();
+    this.drawWorms();
   }
 
   getFullState() {
@@ -225,9 +244,10 @@ export default class Game {
     };
   }
 
-  processMessage(data) {
-    if (data.type === 'assign' && !this.isHost) {
+  processMessage(data, clientId) {
+    if (data.type === 'assign' && this.myPlayerIndex === -1) {
       this.myPlayerIndex = data.playerIndex;
+      console.log('Client assigned playerIndex:', data.playerIndex);
     } else if (data.type === 'state') {
       this.timeLeft = data.timeLeft;
       this.food = data.food ? new Food(this.cols, this.rows) : null;
@@ -247,12 +267,26 @@ export default class Game {
         worm.isShooting = wState.isShooting;
         worm.shootTimer = wState.shootTimer;
       });
+      console.log('Client worms length after state:', this.worms.length);  // NY: Debug-log
+      this.drawAll();  // NY: Extra draw efter state för att säkerställa rendering
     } else if (data.type === 'input' && this.isHost) {
       const worm = this.worms.find(w => w.playerIndex === data.playerIndex);
       if (worm) {
-        if (data.direction && worm.direction !== opposite(data.direction)) worm.direction = data.direction;
+        if (data.direction && worm.direction !== this.opposite(data.direction)) {
+          worm.direction = data.direction;
+        }
         if (data.shoot) worm.shootTongue();
+        console.log('Host processing input for player', data.playerIndex, 'direction:', data.direction, 'shoot:', data.shoot);
       }
+    } else if (data.type === 'request_assign' && this.isHost) {
+      const playerIndex = this.worms.length;
+      const occupied = this.obstacles.concat(this.worms.flatMap(w => w.segments));
+      const newWorm = new Worm(colors[playerIndex % colors.length], null, null, playerIndex);
+      newWorm.reset(null, null, this.cols, this.rows, occupied);
+      this.worms.push(newWorm);
+      this.api.transmit({ type: 'assign', playerIndex }, clientId);
+      this.api.transmit({ type: 'state', ...this.getFullState() });
+      console.log('Assigned playerIndex', playerIndex, 'to client', clientId);
     }
   }
 
@@ -273,6 +307,7 @@ export default class Game {
   }
 
   drawWorms() {
+    console.log('Drawing worms, length:', this.worms.length);  // NY: Debug-log
     this.worms.forEach(worm => {
       worm.segments.forEach((segment, index) => {
         if (segment.x >= 0 && segment.x < this.cols && segment.y >= 0 && segment.y < this.rows) {

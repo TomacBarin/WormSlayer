@@ -43,6 +43,7 @@ document.addEventListener('keydown', (e) => {
       if (!game.isMultiplayer || game.isHost) {
         game.worms.forEach(worm => worm.shootTongue());
       } else {
+        console.log('Sending input: shoot');
         game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, shoot: true });
       }
       return;
@@ -63,7 +64,8 @@ document.addEventListener('keydown', (e) => {
       if (key === map.down.toLowerCase()) direction = 'down';
       if (key === map.left.toLowerCase()) direction = 'left';
       if (key === map.right.toLowerCase()) direction = 'right';
-      if (direction && game.worms[game.myPlayerIndex]?.direction !== opposite(direction)) {
+      if (direction && game.worms[game.myPlayerIndex]?.direction !== game.opposite(direction)) {
+        console.log('Sending input: direction', direction);
         game.api.transmit({ type: 'input', playerIndex: game.myPlayerIndex, direction });
       }
     }
@@ -102,44 +104,26 @@ async function startMultiplayer(isHost) {
   game.isMultiplayer = true;
   game.isHost = isHost;
   game.api = api;
-  game.messageBuffer = [];
-  game.lastMessageId = -1;
+  game.myPlayerIndex = null;
+
+  let assignResolve, stateResolve;
 
   const unsubscribe = api.listen((event, messageId, clientId, data) => {
-    console.log('Received event:', event, 'with data:', data);
-    if (event === 'joined') {
-      console.log('Joined event on host from clientId:', clientId);
-      if (game.isHost) {
-        const playerIndex = game.worms.length;
-        const occupied = game.obstacles.concat(game.worms.flatMap(w => w.segments));
-        const newWorm = new Worm(colors[playerIndex % colors.length], null, null, playerIndex);
-        newWorm.reset(null, null, game.cols, game.rows, occupied);
-        game.worms.push(newWorm);
-        game.api.transmit({ type: 'assign', playerIndex }, clientId);
-        game.api.transmit({ type: 'state', ...game.getFullState() });
-        console.log('Sent assign and state to new client');
-      }
-    } else if (event === 'game') {
+    if (event === 'game') {
       console.log('Received game event with type:', data.type);
-      game.messageBuffer.push({ messageId, data });
-      game.messageBuffer.sort((a, b) => a.messageId - b.messageId);
-      while (game.messageBuffer.length && game.messageBuffer[0].messageId === game.lastMessageId + 1) {
-        const msg = game.messageBuffer.shift();
-        game.lastMessageId = msg.messageId;
-        game.processMessage(msg.data);
-        if (msg.data.type === 'assign') {
-          assignResolve();
-        }
-        if (msg.data.type === 'state') {
-          stateResolve();
-        }
+      game.processMessage(data, clientId);
+      if (data.type === 'assign' && assignResolve) {
+        assignResolve();
+      }
+      if (data.type === 'state' && stateResolve) {
+        stateResolve();
       }
     }
   });
 
   if (isHost) {
     const hostPromise = api.host({ name: 'WormSlayer', private: false });
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 5000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 15000));
     Promise.race([hostPromise, timeoutPromise])
       .then(({ session }) => {
         alert(`Session ID: ${session}`);
@@ -151,23 +135,17 @@ async function startMultiplayer(isHost) {
         alert('Failed to host: ' + e);
       });
   } else {
-    let assignResolve, stateResolve;
-    const assignPromise = new Promise((resolve, reject) => {
-      assignResolve = resolve;
-      setTimeout(() => reject('Timeout waiting for assign'), 5000);
-    });
-    const statePromise = new Promise((resolve, reject) => {
-      stateResolve = resolve;
-      setTimeout(() => reject('Timeout waiting for state'), 5000);
-    });
+    const assignPromise = new Promise(resolve => assignResolve = resolve);
+    const statePromise = new Promise(resolve => stateResolve = resolve);
 
     const sessionID = prompt('Ange Session ID:');
     if (!sessionID) return; // Avbryt om tomt
     const joinPromise = api.join(sessionID, { name: 'Guest' });
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 5000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout: No response from server'), 15000));
     Promise.race([joinPromise, timeoutPromise])
       .then(() => {
-        game.myPlayerIndex = -1;  // Vänta på assign och state
+        game.api.transmit({ type: 'request_assign' });  // Begär assign från host
+        game.myPlayerIndex = -1;
         Promise.all([assignPromise, statePromise]).then(() => {
           game.start(true);
         }).catch(e => {
@@ -180,14 +158,6 @@ async function startMultiplayer(isHost) {
         alert('Failed to join: ' + e);
       });
   }
-}
-
-// Hjälpfunktion
-function opposite(dir) {
-  if (dir === 'up') return 'down';
-  if (dir === 'down') return 'up';
-  if (dir === 'left') return 'right';
-  if (dir === 'right') return 'left';
 }
 
 const colors = ['#19E9FF', '#FF2B6F', '#FFF034', '#FF94A6'];
