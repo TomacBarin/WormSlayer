@@ -1,6 +1,9 @@
 # Square Crawler: The Game
 
-Ett enkelt maskspel med power-ups och hål, och multiplayer-funktion. Byggt i JavaScript med Canvas.
+![Screenshot from spelet](/assets/images/screenCrawlGame.webp)
+
+Ett enkelt Snakespel med power-ups och ett ökande antal hål som spelaren måste undvika, samt multiplayer-funktion.
+Byggt i JavaScript med Canvas.
 
 ## Installation
 
@@ -28,3 +31,7 @@ Ett enkelt maskspel med power-ups och hål, och multiplayer-funktion. Byggt i Ja
 - Flest poäng när timern tar slut vinner.
 
 **?-knappen**: Klicka för spelregler.
+
+## Musik och ljudeffekter
+
+Ljudeffekterna samt den Mycket Vackra Musiken har gjorts utav mig.
