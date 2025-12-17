@@ -119,9 +119,9 @@ export default class Game {
 
     this.ctx.font = '36px Silkscreen, sans-serif';
     this.ctx.fillStyle = '#2D2D2D';  // Samma mörka färg
-    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 135);  // Mer space ned
+    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);  // Mer space ned
     this.ctx.font = '24px Silkscreen, sans-serif';
-    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 180);  // Extra luft
+    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
   }
 
   drawGrid() {
@@ -227,14 +227,15 @@ export default class Game {
         const newHead = worm.segments[0];
 
         let hitOtherWorm = false;
-        this.worms.forEach((otherWorm, otherIndex) => {
-          if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
-            const occupied = this.getAllOccupied();
-            otherWorm.reset(null, null, this.cols, this.rows, occupied);
-            new Audio(this.fxMiss).play();  // för den andra masken
-            hitOtherWorm = true;
+        for (let otherIndex = 0; otherIndex < this.worms.length; otherIndex++) {
+          if (otherIndex !== index) {
+            const otherWorm = this.worms[otherIndex];
+            if (otherWorm.segments.some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+              hitOtherWorm = true;
+              break;
+            }
           }
-        });
+        }
 
         const collision = worm.checkCollision(newHead, this.cols, this.rows, worm.segments, this.food?.pos, this.powerup?.pos, this.obstacles);
 
