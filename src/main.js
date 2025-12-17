@@ -102,12 +102,12 @@ infoBtn.addEventListener('click', () => {
       <h1 style="font-size: 64px; text-align: center; margin-bottom: 32px;">REGLER</h1>
       <p style="font-size: 28px; line-height: 1.4;">
         • Styr med pilar/WASD/TFGH/IJKL.<br>
-        • Vit mat → växt + poäng + mörkt hål (dåligt).<br>
+        • Vit mat → växt + poäng + skapar hål.<br>
         • Orange mat → PowerUp.<br>
         • PowerUp = Dödar fiender och lagar hål.<br>
         • Använd space för powerup.<br>
         • Krock med vägg/kropp/hål/mask → reset.<br>
-        • Längst när timern tagit slut vinner.
+        • Flest poäng när timern tagit slut vinner.
       </p>
       <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #EEEEEE; border: none; cursor: pointer;">Stäng</button>
     </div>

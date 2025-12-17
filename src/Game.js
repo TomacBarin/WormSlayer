@@ -38,12 +38,52 @@ export default class Game {
     this.gameOverActive = false;
 
     // Ladda ljudfiler
-    this.mainMusic = new Audio('assets/music/SquareCrawlMainMusic.ogg');
-    this.mainMusic.loop = true;
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();  // NY: För seamless musik
+    this.mainMusicBuffer = null;
+    this.mainMusicSource = null;
+    this.loadMainMusic();  // NY: Ladda buffer asynkront
     this.fxEatFood = 'assets/music/FX_EatFood.ogg';
     this.fxPowerUp = 'assets/music/FX_PowerUp.ogg';
     this.fxNewPower = 'assets/music/FX_NewPower.ogg';
     this.fxMiss = 'assets/music/FX_Miss.ogg';
+  }
+
+  // NY: Metod för att ladda musik-buffer
+  async loadMainMusic() {
+    try {
+      const response = await fetch('assets/music/SquareCrawlMainMusic.ogg');
+      const arrayBuffer = await response.arrayBuffer();
+      this.mainMusicBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    } catch (error) {
+      console.error('Error loading main music:', error);
+      // Fallback till gammal metod om fel
+      this.mainMusic = new Audio('assets/music/SquareCrawlMainMusic.ogg');
+      this.mainMusic.loop = true;
+    }
+  }
+
+  // NY: Metod för att spela seamless loop
+  playMainMusic() {
+    if (this.mainMusicBuffer) {
+      this.mainMusicSource = this.audioContext.createBufferSource();
+      this.mainMusicSource.buffer = this.mainMusicBuffer;
+      this.mainMusicSource.loop = true;
+      this.mainMusicSource.connect(this.audioContext.destination);
+      this.mainMusicSource.start(0);
+    } else if (this.mainMusic) {
+      this.mainMusic.play();  // Fallback
+    }
+  }
+
+  // NY: Metod för att stoppa musik
+  stopMainMusic() {
+    if (this.mainMusicSource) {
+      this.mainMusicSource.stop();
+      this.mainMusicSource = null;
+    } else if (this.mainMusic) {
+      this.mainMusic.pause();
+      this.mainMusic.currentTime = 0;
+    }
   }
 
   opposite(dir) {
@@ -79,9 +119,9 @@ export default class Game {
 
     this.ctx.font = '36px Silkscreen, sans-serif';
     this.ctx.fillStyle = '#2D2D2D';  // Samma mörka färg
-    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 130);  // Mer space ned
+    this.ctx.fillText('Enter: Local Play', this.canvas.width / 2, this.canvas.height / 2 + 135);  // Mer space ned
     this.ctx.font = '24px Silkscreen, sans-serif';
-    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 170);  // Extra luft
+    this.ctx.fillText('H: Host | J: Join', this.canvas.width / 2, this.canvas.height / 2 + 180);  // Extra luft
   }
 
   drawGrid() {
@@ -127,8 +167,8 @@ export default class Game {
     this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, '0')}`;
     this.scoreEls.forEach(el => el.textContent = '000');
 
-    // Spela bakgrundsmusik
-    this.mainMusic.play();
+    // NY: Spela seamless musik
+    this.playMainMusic();
   }
 
   stop() {
@@ -140,9 +180,8 @@ export default class Game {
     this.gameOverActive = false;
     this.drawTitleScreen();
 
-    // Pausa och återställ musik
-    this.mainMusic.pause();
-    this.mainMusic.currentTime = 0;
+    // NY: Stoppa musik
+    this.stopMainMusic();
   }
 
   update(timestamp) {

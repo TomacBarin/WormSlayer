@@ -214,3 +214,12 @@ h1 {
 #game-board {
     background-color: var(--able-gray-20) !important;  /* #2D2D2D alltid för marginal/gap */
 }
+
+footer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    color: var(--able-gray-50);
+    font-size: var(--spacing-3);
+}
