@@ -1,3 +1,4 @@
+
 export class mpapi {
 	constructor(serverUrl, identifier) {
 		this.serverUrl = serverUrl;
@@ -20,27 +21,26 @@ export class mpapi {
 
 		this.socket = new WebSocket(this.serverUrl);
 
-		// console.log('Connecting to mpapi server at', this.serverUrl);  // Ta bort för mindre spam
+		console.log('Connecting to mpapi server at', this.serverUrl);
 
 		this.socket.addEventListener('open', () => {
-			// console.log('WebSocket connection established and open');  // Ta bort
+			console.log('WebSocket connection established');
 
 			const pending = this.queue.slice();
 			this.queue.length = 0;
 			for (let i = 0; i < pending.length; i += 1) {
-				// console.log('Sending pending message:', pending[i]);  // Ta bort
 				this.socket.send(pending[i]);
 			}
 		});
 
-		// console.log('Setting up WebSocket event listeners');  // Ta bort
+		console.log('Setting up WebSocket event listeners');
+
 
 		this.socket.addEventListener('message', (event) => {
 			let payload;
 			try {
 				payload = JSON.parse(event.data);
 			} catch (e) {
-				console.error('Failed to parse message:', e);
 				return;
 			}
 
@@ -52,7 +52,8 @@ export class mpapi {
 				return;
 			}
 
-			// console.log('Received payload:', payload);  // Ta bort för mindre spam
+			console.log('Received payload:', payload);
+
 
 			const cmd = payload.cmd;
 			const messageId = typeof payload.messageId === 'number' ? payload.messageId : null;
@@ -89,7 +90,7 @@ export class mpapi {
 					this.onList(data);
 
 			} else if (cmd === 'joined' || cmd === 'left' || cmd === 'closed' || cmd === 'game') {
-				// console.log(`Received ${cmd} command`);  // Ta bort
+				console.log(`Received ${cmd} command`);
 
 				this.listeners.forEach((listener) => {
 					try {
@@ -103,22 +104,19 @@ export class mpapi {
 		});
 
 		this.socket.addEventListener('close', () => {
-			console.log('WebSocket connection closed');
 			this.socket = null;
 		});
 
 		this.socket.addEventListener('error', (e) => {
-			console.error('WebSocket error occurred:', e);
+			console.error('WebSocket error occurred', e);
 			// Ingen ytterligare hantering här; spelkoden kan själv reagera på uteblivna meddelanden.
 		});
 	}
 
 	_enqueueOrSend(serializedMessage) {
 		if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-			// console.log('Sending message:', serializedMessage);  // Ta bort för mindre spam
 			this.socket.send(serializedMessage);
 		} else {
-			// console.log('Queuing message (socket not open):', serializedMessage);  // Ta bort
 			this.queue.push(serializedMessage);
 			this._connect();
 		}
@@ -150,7 +148,6 @@ export class mpapi {
 			this._enqueueOrSend(serialized);
 
 			this.onHost = (session, clientId, data) => {
-				// console.log('Host callback triggered with session:', session);  // Ta bort
 				this.onHost = null;
 				return resolve({ session, clientId, data });
 			};
@@ -176,7 +173,6 @@ export class mpapi {
 			*/
 
 			this.onJoin = (data) => {
-				// console.log('Join callback triggered');  // Ta bort
 				this.onJoin = null;
 				return resolve(data);
 			};
