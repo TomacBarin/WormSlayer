@@ -603,24 +603,27 @@ export default class Game {
     });
   }
 
-  drawTongues() {
-    this.worms.forEach(worm => {
-      if (worm.isShooting) {
-        this.ctx.fillStyle = "#FF39D4";
-        const thickness = Math.round(this.cellSize * 0.12);
-        worm.getTonguePositions(this.cols, this.rows).forEach(pos => {
-          const x = this.offsetX + pos.x * (this.cellSize + this.gap);
-          const y = this.offsetY + pos.y * (this.cellSize + this.gap);
-          this.ctx.fillRect(
-            x + thickness / 2,
-            y + thickness / 2,
-            this.cellSize - thickness,
-            this.cellSize - thickness
-          );
-        });
-      }
-    });
-  }
+drawTongues() {
+  this.worms.forEach(worm => {
+    if (worm.isShooting) {
+      this.ctx.fillStyle = worm.color;
+      const thickness = 2;  // Fast 2px för jättesmal tunga – ändra till 1 eller 3 om du vill testa
+      worm.getTonguePositions(this.cols, this.rows).forEach(pos => {
+        const x = this.offsetX + pos.x * (this.cellSize + this.gap);
+        const y = this.offsetY + pos.y * (this.cellSize + this.gap);
+        if (worm.direction === 'left' || worm.direction === 'right') {
+          // Horisontell: full bredd (längd), smal höjd, centrerad vertikalt
+          const height = thickness;
+          this.ctx.fillRect(x, y + (this.cellSize - height) / 2, this.cellSize, height);
+        } else {
+          // Vertikal: full höjd (längd), smal bredd, centrerad horisontellt
+          const width = thickness;
+          this.ctx.fillRect(x + (this.cellSize - width) / 2, y, width, this.cellSize);
+        }
+      });
+    }
+  });
+}
 
   gameOver() {
     this.stop();
