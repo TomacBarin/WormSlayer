@@ -584,11 +584,21 @@ export default class Game {
 
   drawWorms() {
     this.worms.forEach(worm => {
-      worm.segments.forEach((seg, i) => {
-        const x = this.offsetX + seg.x * (this.cellSize + this.gap);
-        const y = this.offsetY + seg.y * (this.cellSize + this.gap);
+            worm.segments.forEach((pos, index) => {
+        const cellX = this.offsetX + pos.x * (this.cellSize + this.gap);
+        const cellY = this.offsetY + pos.y * (this.cellSize + this.gap);
         this.ctx.fillStyle = worm.color;
-        this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+        let size, offset;
+        if (index === 0) {
+          // Huvudet: full storlek (24px)
+          size = this.cellSize;
+          offset = 0;
+        } else {
+          // Svansen/kroppen: ~60% storlek (14px), centrerad i rutan
+          size = Math.floor(this.cellSize * 0.6);
+          offset = Math.floor((this.cellSize - size) / 2);
+        }
+        this.ctx.fillRect(cellX + offset, cellY + offset, size, size);
       });
     });
   }
