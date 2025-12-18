@@ -16,11 +16,8 @@ Byggt i JavaScript med Canvas.
 
 **Kontroller**:
 
-- P1 (blå): Piltangenter
-- P2 (rosa): WASD
-- P3 (gul): TFGH
-- P4 (korall): IJKL
-- Mellanslag: Använd powerup (tunga som dödar andra och lagar hål).
+Samtliga ormar kontrolleras med piltangerna, både i Local Play samt Multiplayer.
+När en PowerUp har ätits (orange ruta) aktiveras tungan med space. Tungan är aktiv i cirka fyra sekunder, och kan både laga hål på spelplanen, samt döda fiender.
 
 **Regler**:
 
