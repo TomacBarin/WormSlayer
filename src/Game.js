@@ -314,7 +314,7 @@ export default class Game {
         );
       } else {
         // Local
-        this.worms = colors.map((color, i) => new Worm(color, null, null, i));
+        this.worms = [new Worm(colors[0], null, null, 0)];
       }
       this.worms.forEach((worm) => worm.reset(null, null, this.cols, this.rows, []));
       if (isMultiplayer && this.isHost) {
