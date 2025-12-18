@@ -1,3 +1,4 @@
+// Game.js
 import Worm from "./Worm.js";
 import Food from "./Food.js";
 import Powerup from "./Powerup.js";
@@ -22,8 +23,9 @@ export default class Game {
     this.isHost = false;
     this.api = null;
     this.myPlayerIndex = null;
+    this.myClientId = null; // NY: För lobby
     this.lastFrameTime = 0;
-    this.frameInterval = 120; // 500 BPM = 120ms/tick
+    this.frameInterval = 120; // Återställt till original 120ms (500 BPM)
     this.frameCounter = 0;
     this.worms = [];
     this.food = null;
@@ -38,6 +40,14 @@ export default class Game {
     );
     this.updateOffsets();
     this.gameOverActive = false;
+
+    // NY: Lobby properties
+    this.lobbyState = false;
+    this.connectedPlayers = []; // {clientId, playerIndex}
+    this.sessionId = null;
+    this.lobbyCountdown = 0;
+    this.lobbyStartTime = null;
+    this.lobbyBgFoods = []; // För bakgrundsanimation
 
     // Ladda ljudfiler
     this.audioContext = new (window.AudioContext ||
@@ -140,373 +150,463 @@ export default class Game {
     this.ctx.fillText(
       "Enter: Local Play",
       this.canvas.width / 2,
-      this.canvas.height / 2 + 130
-    ); // Mer space ned
-    this.ctx.font = "24px Silkscreen, sans-serif";
+      this.canvas.height / 2 + 140
+    );
     this.ctx.fillText(
-      "H: Host | J: Join",
+      "H: Host Multiplayer",
       this.canvas.width / 2,
-      this.canvas.height / 2 + 170
-    ); // Extra luft
+      this.canvas.height / 2 + 190
+    );
+    this.ctx.fillText(
+      "J: Join Multiplayer",
+      this.canvas.width / 2,
+      this.canvas.height / 2 + 240
+    );
   }
 
-  drawGrid() {
-    this.ctx.fillStyle = this.gameBgColor;
+  // NY: drawLobby-metod
+  drawLobby() {
+    this.ctx.fillStyle = this.introBgColor;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    this.ctx.fillStyle = this.cellColor;
-    for (let row = 0; row < this.rows; row++) {
-      for (let col = 0; col < this.cols; col++) {
-        const pos = { x: col, y: row };
-        if (!this.obstacles.some((obs) => obs.x === pos.x && obs.y === pos.y)) {
-          const x = this.offsetX + col * (this.cellSize + this.gap);
-          const y = this.offsetY + row * (this.cellSize + this.gap);
-          this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-        }
-      }
-    }
-  }
+    // Rubrik
+    this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
+    this.ctx.font = "192px VT323, monospace";
+    this.ctx.fillStyle = "#2D2D2D";
+    this.ctx.fillText(
+      "LOBBY",
+      this.canvas.width / 2,
+      this.canvas.height / 2 - 200
+    );
 
-  start(isMulti = false) {
-    this.isMultiplayer = isMulti;
-    this.isRunning = true;
-    this.gameOverActive = false;
-    this.timeLeft = 999;
-    this.obstacles = [];
-    this.powerupTimer = 0;
-    this.powerup = null;
-    this.foodEaten = false;
-    if (this.isHost || !isMulti) {
-      this.worms = [new Worm("#19E9FF", 3, 3, 0)];
-      if (!isMulti) {
-        this.worms.push(new Worm("#FF2B6F", 30, 3, 1));
-        this.worms.push(new Worm("#FFF034", 3, 14, 2));
-        this.worms.push(new Worm("#FF94A6", 30, 14, 3));
-      }
-      this.food = new Food(this.cols, this.rows);
+    // Session ID för host
+    if (this.isHost && this.sessionId) {
+      this.ctx.font = "48px Silkscreen, sans-serif";
+      this.ctx.fillText(
+        `Session ID: ${this.sessionId}`,
+        this.canvas.width / 2,
+        this.canvas.height / 2 - 140
+      );
     } else {
-      this.worms = [];
-    }
-    this.lastFrameTime = performance.now();
-    this.frameCounter = 0;
-    requestAnimationFrame(this.update.bind(this));
-    this.timerEl.textContent = `Time: ${this.timeLeft
-      .toString()
-      .padStart(3, "0")}`;
-    this.scoreEls.forEach((el) => (el.textContent = "000"));
-
-    // NY: Spela seamless musik
-    this.playMainMusic();
-  }
-
-  stop() {
-    this.isRunning = false;
-  }
-
-  resetToTitle() {
-    this.stop();
-    this.gameOverActive = false;
-    this.drawTitleScreen();
-
-    // NY: Stoppa musik
-    this.stopMainMusic();
-  }
-
-  update(timestamp) {
-    if (!this.isRunning) return;
-
-    const delta = timestamp - this.lastFrameTime;
-    if (delta >= this.frameInterval) {
-      this.lastFrameTime = timestamp - (delta % this.frameInterval);
-      this.updateLogic();
-      this.frameCounter++;
+      this.ctx.font = "48px Silkscreen, sans-serif";
+      this.ctx.fillText(
+        "Waiting for players...",
+        this.canvas.width / 2,
+        this.canvas.height / 2 - 140
+      );
     }
 
-    this.drawAll();
+    // Spelarlista
+    const startY = this.canvas.height / 2 - 80;
+    for (let i = 0; i < 4; i++) {
+      const player = this.connectedPlayers.find(p => p.playerIndex === i);
+      const color = colors[i];
+      const status = player ? "Connected" : "Waiting...";
+      const controls = i === 0 ? "Arrows" : i === 1 ? "WASD" : i === 2 ? "TFGH" : "IJKL";
 
-    requestAnimationFrame(this.update.bind(this));
-  }
+      // Ikon: Kvadrat i färg
+      this.ctx.fillStyle = color;
+      this.ctx.fillRect(
+        this.canvas.width / 2 - 300,
+        startY + i * 60,
+        40,
+        40
+      );
 
-  updateLogic() {
-    this.timeLeft--;
-    this.timerEl.textContent = `Time: ${this.timeLeft
-      .toString()
-      .padStart(3, "0")}`;
-    if (this.timeLeft <= 0) {
-      this.gameOver();
-      return;
+      // Text
+      this.ctx.font = "36px VT323, monospace";
+      this.ctx.fillStyle = "#2D2D2D";
+      this.ctx.textAlign = "left";
+      this.ctx.fillText(
+        `Player ${i + 1}${i === 0 ? " (Host)" : ""}: ${status} - Color: ${color} - Controls: ${controls}`,
+        this.canvas.width / 2 - 240,
+        startY + i * 60 + 20
+      );
     }
 
-    if (this.isHost || !this.isMultiplayer) {
-      this.powerupTimer++;
-      if (this.powerupTimer >= 83) {
-        const occupied = this.getAllOccupied();
-        if (this.powerup) {
-          this.powerup.newPos(occupied);
-        } else {
-          this.powerup = new Powerup(this.cols, this.rows, occupied);
-        }
-        this.powerupTimer = 0;
-        new Audio(this.fxNewPower).play();
-      }
+    // Statusmeddelande
+    const numConnected = this.connectedPlayers.length;
+    this.ctx.textAlign = "center";
+    this.ctx.font = "48px Silkscreen, sans-serif";
+    this.ctx.fillText(
+      `${numConnected} players connected. Need 4 to start.`,
+      this.canvas.width / 2,
+      this.canvas.height / 2 + 200
+    );
 
-      this.worms.forEach((worm, index) => {
-        worm.updateShoot();
-        const head = { ...worm.segments[0] };
-        worm.move(this.cols, this.rows);
-        const newHead = worm.segments[0];
+    // Nedräkning om aktiv
+    if (this.lobbyCountdown > 0) {
+      this.ctx.font = "64px VT323, monospace";
+      this.ctx.fillText(
+        `Game starts in ${this.lobbyCountdown} seconds...`,
+        this.canvas.width / 2,
+        this.canvas.height / 2 + 260
+      );
+    }
 
-        let hitOtherWorm = false;
-        for (let otherIndex = 0; otherIndex < this.worms.length; otherIndex++) {
-          if (otherIndex !== index) {
-            const otherWorm = this.worms[otherIndex];
-            if (
-              otherWorm.segments.some(
-                (seg) => seg.x === newHead.x && seg.y === newHead.y
-              )
-            ) {
-              hitOtherWorm = true;
-              break;
-            }
-          }
-        }
+    // Bakgrundsanimation: Blinkande mat-rutor
+    this.drawLobbyBgFoods();
+  }
 
-        const collision = worm.checkCollision(
-          newHead,
-          this.cols,
-          this.rows,
-          worm.segments,
-          this.food?.pos,
-          this.powerup?.pos,
-          this.obstacles
-        );
-
-        if (collision === "food") {
-          worm.grow();
-          this.obstacles.push({ ...head });
-          const occupied = this.getAllOccupied();
-          this.food.newPos(occupied);
-          this.foodEaten = true;
-          new Audio(this.fxEatFood).play();
-        } else if (collision === "powerup") {
-          worm.tongueShots++;
-          this.powerup = null;
-          new Audio(this.fxPowerUp).play();
-        } else if (
-          collision === "wall" ||
-          collision === "self" ||
-          collision === "obstacle" ||
-          hitOtherWorm
-        ) {
-          const occupied = this.getAllOccupied();
-          worm.reset(null, null, this.cols, this.rows, occupied);
-          new Audio(this.fxMiss).play(); // för den egna masken
-        }
-
-        if (worm.isShooting) {
-          const tonguePos = worm.getTonguePositions(this.cols, this.rows);
-          tonguePos.forEach((pos) => {
-            this.worms.forEach((otherWorm, otherIndex) => {
-              if (
-                otherIndex !== index &&
-                otherWorm.segments.some(
-                  (seg) => seg.x === pos.x && seg.y === pos.y
-                )
-              ) {
-                const occupied = this.getAllOccupied();
-                otherWorm.reset(null, null, this.cols, this.rows, occupied);
-                new Audio(this.fxMiss).play();
-              }
-            });
-            const obsIndex = this.obstacles.findIndex(
-              (obs) => obs.x === pos.x && obs.y === pos.y
-            );
-            if (obsIndex !== -1) {
-              this.obstacles.splice(obsIndex, 1);
-            }
-          });
-        }
-
-        this.scoreEls[index].textContent = ((worm.segments.length - 1) % 1000)
-          .toString()
-          .padStart(3, "0");
+  // NY: Generera och rita bakgrundsmat
+  initLobbyBgFoods() {
+    this.lobbyBgFoods = [];
+    for (let i = 0; i < 10; i++) { // 10 slumpmässiga mat-rutor
+      this.lobbyBgFoods.push({
+        x: Math.floor(Math.random() * this.cols),
+        y: Math.floor(Math.random() * this.rows),
+        blink: Math.random() > 0.5
       });
+    }
+  }
 
-      if (this.isMultiplayer && this.isHost) {
+  drawLobbyBgFoods() {
+    this.ctx.fillStyle = "#EEEEEE";
+    this.lobbyBgFoods.forEach(food => {
+      if (food.blink) {
+        const x = this.offsetX + food.x * (this.cellSize + this.gap);
+        const y = this.offsetY + food.y * (this.cellSize + this.gap);
+        this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+      }
+    });
+    // Uppdatera blink: Slumpmässig toggle var frame (för animation)
+    if (Math.random() < 0.1) {
+      this.lobbyBgFoods.forEach(food => {
+        food.blink = !food.blink;
+      });
+    }
+  }
+
+  // NY: Starta countdown om 4 spelare
+  checkStartLobbyCountdown() {
+    if (this.connectedPlayers.length === 4 && this.lobbyCountdown === 0) {
+      this.lobbyStartTime = Date.now() + 5000;
+      this.lobbyCountdown = 5;
+      // Broadcast countdown-start till klienter
+      if (this.isHost) {
         this.api.transmit({
-          type: "state",
-          worms: this.worms.map((w) => ({
-            segments: w.segments,
-            direction: w.direction,
-            tongueShots: w.tongueShots,
-            isShooting: w.isShooting,
-            shootTimer: w.shootTimer,
-          })),
-          food: this.food.pos,
-          powerup: this.powerup?.pos,
-          obstacles: this.obstacles,
-          timeLeft: this.timeLeft,
+          type: "lobby_countdown",
+          startTime: this.lobbyStartTime
         });
       }
     }
   }
 
-  getAllOccupied() {
-    return [
-      ...this.worms.flatMap((w) => w.segments),
-      ...this.obstacles,
-      this.food?.pos,
-      this.powerup?.pos,
-    ].filter(Boolean);
+  start(isMultiplayer) {
+    this.isMultiplayer = isMultiplayer;
+    this.isRunning = true;
+    this.obstacles = [];
+    this.timeLeft = 999;
+    this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, "0")}`;
+    this.playMainMusic(); // Starta musik
+
+    if (isMultiplayer && !this.isHost) {
+      this.worms = [];
+      // Do not initialize food and powerup for clients; they will be set from state
+    } else {
+      this.food = new Food(this.cols, this.rows);
+      this.powerup = new Powerup(this.cols, this.rows);
+      if (isMultiplayer) {
+        // Host
+        this.worms = this.connectedPlayers.map((p, i) => 
+          new Worm(colors[i], null, null, i)
+        );
+      } else {
+        // Local
+        this.worms = colors.map((color, i) => new Worm(color, null, null, i));
+      }
+      this.worms.forEach((worm) => worm.reset(null, null, this.cols, this.rows, []));
+      if (isMultiplayer && this.isHost) {
+        this.broadcastState();
+      }
+    }
+    this.updateScores();
+    this.animate();
   }
 
+  stop() {
+    this.isRunning = false;
+    this.stopMainMusic(); // Stoppa musik
+  }
+
+  resetToTitle() {
+    this.isRunning = false;
+    this.gameOverActive = false;
+    this.lobbyState = false; // NY: Återställ lobby
+    this.connectedPlayers = [];
+    this.sessionId = null;
+    this.lobbyCountdown = 0;
+    this.lobbyStartTime = null;
+    this.stopMainMusic();
+    this.drawTitleScreen();
+  }
+
+  animate(timestamp = 0) {
+    if (!this.isRunning && !this.lobbyState) return;
+
+    requestAnimationFrame(this.animate.bind(this));
+
+    if (this.lobbyState) {
+      // NY: Rita lobby
+      const now = Date.now();
+      if (this.lobbyStartTime && now >= this.lobbyStartTime) {
+        this.lobbyState = false;
+        this.start(true);
+        return;
+      }
+      if (this.lobbyStartTime) {
+        this.lobbyCountdown = Math.max(0, Math.ceil((this.lobbyStartTime - now) / 1000));
+      }
+      this.drawLobby();
+      return;
+    }
+
+    const delta = timestamp - this.lastFrameTime;
+    if (delta < this.frameInterval) return;
+    this.lastFrameTime = timestamp - (delta % this.frameInterval); // NY: Bättre timing för jämn hastighet
+
+    this.drawGrid();
+    this.drawObstacles();
+    this.drawFood();
+    this.drawPowerup();
+    this.drawWorms();
+    this.drawTongues();
+
+    if (this.isHost || !this.isMultiplayer) {
+      this.updateGame();
+    }
+  }
+
+  updateGame() {
+    this.worms.forEach(worm => worm.updateShoot());
+
+    const allSegments = this.worms.flatMap(w => w.segments);
+
+    this.worms.forEach((worm, index) => {
+      worm.move(this.cols, this.rows);
+      const head = worm.segments[0];
+      const collision = worm.checkCollision(
+        head,
+        this.cols,
+        this.rows,
+        worm.segments,
+        this.food ? this.food.pos : null,
+        this.powerup ? this.powerup.pos : null,
+        this.obstacles
+      );
+
+      // Additional check for other worms
+      let otherCollision = false;
+      this.worms.forEach((other, oi) => {
+        if (oi !== index && other.segments.some(seg => seg.x === head.x && seg.y === head.y)) {
+          otherCollision = true;
+        }
+      });
+
+      if (collision === "food") {
+        worm.grow();
+        this.obstacles.push({ ...this.food.pos });
+        this.food.newPos([...allSegments, ...this.obstacles]);
+        new Audio(this.fxEatFood).play();
+      } else if (collision === "powerup") {
+        worm.tongueShots += 1;
+        this.powerup.newPos([...allSegments, ...this.obstacles]);
+        new Audio(this.fxPowerUp).play();
+      } else if (collision || otherCollision) {
+        worm.reset(null, null, this.cols, this.rows, [...allSegments, ...this.obstacles]);
+      }
+
+      if (worm.isShooting) {
+        const tonguePos = worm.getTonguePositions(this.cols, this.rows);
+        tonguePos.forEach(pos => {
+          this.worms.forEach((otherWorm, otherIndex) => {
+            if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
+              otherWorm.reset(null, null, this.cols, this.rows, [...allSegments, ...this.obstacles]);
+              new Audio(this.fxNewPower).play();
+            }
+          });
+          const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
+          if (obsIndex !== -1) this.obstacles.splice(obsIndex, 1);
+        });
+      }
+    });
+
+    this.updateScores();
+    this.timeLeft--;
+    this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, "0")}`;
+    if (this.timeLeft <= 0) this.gameOver();
+
+    if (this.isMultiplayer && this.isHost) {
+      this.broadcastState();
+    }
+  }
+
+  broadcastState() {
+    this.api.transmit({
+      type: "state",
+      worms: this.worms.map(w => ({
+        segments: w.segments,
+        direction: w.direction,
+        tongueShots: w.tongueShots,
+        isShooting: w.isShooting,
+        shootTimer: w.shootTimer,
+        playerIndex: w.playerIndex
+      })),
+      food: this.food ? this.food.pos : null,
+      powerup: this.powerup ? this.powerup.pos : null,
+      obstacles: this.obstacles,
+      timeLeft: this.timeLeft
+    });
+  }
+
+  // NY: Utökad processMessage för lobby
   processMessage(data, clientId) {
-    if (data.type === "input") {
+    if (data.type === "request_assign" && this.isHost) {
+      const nextIndex = this.connectedPlayers.length;
+      if (nextIndex < 4) {
+        this.connectedPlayers.push({clientId, playerIndex: nextIndex});
+        this.api.transmit({
+          type: "assign",
+          playerIndex: nextIndex,
+          connectedPlayers: this.connectedPlayers
+        }, clientId); // Skicka till nya klienten
+        this.api.transmit({
+          type: "lobby_state",
+          connectedPlayers: this.connectedPlayers
+        }); // Broadcast till alla
+        this.checkStartLobbyCountdown();
+      }
+    } else if (data.type === "assign") {
+      this.myPlayerIndex = data.playerIndex;
+      this.connectedPlayers = data.connectedPlayers;
+      this.checkStartLobbyCountdown();
+    } else if (data.type === "lobby_state") {
+      this.connectedPlayers = data.connectedPlayers;
+      this.checkStartLobbyCountdown();
+    } else if (data.type === "lobby_countdown") {
+      this.lobbyStartTime = data.startTime;
+    } else if (data.type === "start_game" && !this.isHost) {
+      this.lobbyState = false;
+      this.start(true);
+    } else if (data.type === "input") {
       const worm = this.worms[data.playerIndex];
       if (worm) {
-        if (
-          data.direction &&
-          worm.direction !== this.opposite(data.direction)
-        ) {
+        if (data.direction && worm.direction !== this.opposite(data.direction)) {
           worm.direction = data.direction;
         }
         if (data.shoot) {
           worm.shootTongue();
         }
       }
-    } else if (data.type === "request_assign") {
-      const available = [1, 2, 3].find(
-        (i) => !this.worms.some((w) => w.playerIndex === i)
-      );
-      if (available) {
-        const startPositions = [
-          { x: 30, y: 3 },
-          { x: 3, y: 14 },
-          { x: 30, y: 14 },
-        ];
-        const pos = startPositions[available - 1];
-        const worm = new Worm(colors[available], pos.x, pos.y, available);
-        this.worms.push(worm);
-        this.api.transmit({ type: "assign", playerIndex: available }, clientId);
-        this.api.transmit({
-          type: "state",
-          worms: this.worms.map((w) => ({
-            segments: w.segments,
-            direction: w.direction,
-            tongueShots: w.tongueShots,
-            isShooting: w.isShooting,
-            shootTimer: w.shootTimer,
-          })),
-          food: this.food.pos,
-          powerup: this.powerup?.pos,
-          obstacles: this.obstacles,
-          timeLeft: this.timeLeft,
-        });
-      }
     } else if (data.type === "state") {
-      this.worms = data.worms.map((dw, i) => {
-        const color = colors[i];
-        let worm = this.worms[i] || new Worm(color, null, null, i);
-        worm.segments = dw.segments;
-        worm.direction = dw.direction;
-        worm.tongueShots = dw.tongueShots;
-        worm.isShooting = dw.isShooting;
-        worm.shootTimer = dw.shootTimer;
+      this.worms = data.worms.map(w => {
+        const worm = new Worm(colors[w.playerIndex], null, null, w.playerIndex);
+        worm.segments = w.segments;
+        worm.direction = w.direction;
+        worm.tongueShots = w.tongueShots;
+        worm.isShooting = w.isShooting;
+        worm.shootTimer = w.shootTimer;
         return worm;
       });
-      this.food = { pos: data.food };
-      this.powerup = data.powerup ? { pos: data.powerup } : null;
+      if (!this.food && data.food) {
+        this.food = new Food(this.cols, this.rows);
+      }
+      if (this.food && data.food) this.food.pos = data.food;
+      if (!this.powerup && data.powerup) {
+        this.powerup = new Powerup(this.cols, this.rows);
+      }
+      if (this.powerup && data.powerup) this.powerup.pos = data.powerup;
       this.obstacles = data.obstacles;
       this.timeLeft = data.timeLeft;
-      this.timerEl.textContent = `Time: ${this.timeLeft
-        .toString()
-        .padStart(3, "0")}`;
-      this.scoreEls.forEach(
-        (el, i) =>
-          (el.textContent = ((this.worms[i]?.segments.length - 1 || 0) % 1000)
-            .toString()
-            .padStart(3, "0"))
-      );
-    } else if (data.type === "assign") {
-      this.myPlayerIndex = data.playerIndex;
-      this.worms[this.myPlayerIndex] = new Worm(
-        colors[this.myPlayerIndex],
-        null,
-        null,
-        this.myPlayerIndex
-      );
+      this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, "0")}`;
+      this.updateScores();
     }
   }
 
-  drawAll() {
-    this.drawGrid();
-
-    if (this.food) {
-      const x = this.offsetX + this.food.pos.x * (this.cellSize + this.gap);
-      const y = this.offsetY + this.food.pos.y * (this.cellSize + this.gap);
-      this.ctx.fillStyle = "#FFFFFF";
-      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-    }
-
-    if (this.powerup) {
-      const x = this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap);
-      const y = this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap);
-      this.ctx.fillStyle = "#FFA500";
-      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-    }
-
-    this.obstacles.forEach((obs) => {
-      const x = this.offsetX + obs.x * (this.cellSize + this.gap);
-      const y = this.offsetY + obs.y * (this.cellSize + this.gap);
-      this.ctx.fillStyle = this.obstacleColor;
-      this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
+  updateScores() {
+    this.worms.forEach((worm, i) => {
+      if (this.scoreEls[i]) {
+        this.scoreEls[i].textContent = (worm.segments.length - 1).toString().padStart(3, "0");
+      }
     });
+  }
 
-    this.worms.forEach((worm) => {
-      worm.segments.forEach((segment, index) => {
-        const x = this.offsetX + segment.x * (this.cellSize + this.gap);
-        const y = this.offsetY + segment.y * (this.cellSize + this.gap);
+  drawGrid() {
+    this.ctx.fillStyle = this.gameBgColor;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
+        this.ctx.fillStyle = this.cellColor;
+        this.ctx.fillRect(
+          this.offsetX + x * (this.cellSize + this.gap),
+          this.offsetY + y * (this.cellSize + this.gap),
+          this.cellSize,
+          this.cellSize
+        );
+      }
+    }
+  }
+
+  drawObstacles() {
+    this.ctx.fillStyle = this.obstacleColor;
+    this.obstacles.forEach(obs => {
+      this.ctx.fillRect(
+        this.offsetX + obs.x * (this.cellSize + this.gap),
+        this.offsetY + obs.y * (this.cellSize + this.gap),
+        this.cellSize,
+        this.cellSize
+      );
+    });
+  }
+
+  drawFood() {
+    if (!this.food) return;
+    this.ctx.fillStyle = "#EEEEEE";
+    this.ctx.fillRect(
+      this.offsetX + this.food.pos.x * (this.cellSize + this.gap),
+      this.offsetY + this.food.pos.y * (this.cellSize + this.gap),
+      this.cellSize,
+      this.cellSize
+    );
+  }
+
+  drawPowerup() {
+    if (!this.powerup) return;
+    this.ctx.fillStyle = "#F39420";
+    this.ctx.fillRect(
+      this.offsetX + this.powerup.pos.x * (this.cellSize + this.gap),
+      this.offsetY + this.powerup.pos.y * (this.cellSize + this.gap),
+      this.cellSize,
+      this.cellSize
+    );
+  }
+
+  drawWorms() {
+    this.worms.forEach(worm => {
+      worm.segments.forEach((seg, i) => {
+        const x = this.offsetX + seg.x * (this.cellSize + this.gap);
+        const y = this.offsetY + seg.y * (this.cellSize + this.gap);
         this.ctx.fillStyle = worm.color;
-        if (index === 0) {
-          this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
-        } else {
-          const tailSize = Math.round(this.cellSize * 0.6);
-          const tailOffset = (this.cellSize - tailSize) / 2;
-          this.ctx.fillRect(x + tailOffset, y + tailOffset, tailSize, tailSize);
-        }
+        this.ctx.fillRect(x, y, this.cellSize, this.cellSize);
       });
+    });
+  }
 
+  drawTongues() {
+    this.worms.forEach(worm => {
       if (worm.isShooting) {
-        const tonguePos = worm.getTonguePositions(this.cols, this.rows);
-        tonguePos.forEach((pos) => {
-          if (
-            pos.x >= 0 &&
-            pos.x < this.cols &&
-            pos.y >= 0 &&
-            pos.y < this.rows
-          ) {
-            const x = this.offsetX + pos.x * (this.cellSize + this.gap);
-            const y = this.offsetY + pos.y * (this.cellSize + this.gap);
-            this.ctx.fillStyle = worm.color;
-            const thickness = Math.max(2, Math.round(this.cellSize * 0.12));
-            if (worm.direction === "left" || worm.direction === "right") {
-              const height = thickness;
-              this.ctx.fillRect(
-                x,
-                y + (this.cellSize - height) / 2,
-                this.cellSize,
-                height
-              );
-            } else {
-              const width = thickness;
-              this.ctx.fillRect(
-                x + (this.cellSize - width) / 2,
-                y,
-                width,
-                this.cellSize
-              );
-            }
-          }
+        this.ctx.fillStyle = "#FF39D4";
+        const thickness = Math.round(this.cellSize * 0.12);
+        worm.getTonguePositions(this.cols, this.rows).forEach(pos => {
+          const x = this.offsetX + pos.x * (this.cellSize + this.gap);
+          const y = this.offsetY + pos.y * (this.cellSize + this.gap);
+          this.ctx.fillRect(
+            x + thickness / 2,
+            y + thickness / 2,
+            this.cellSize - thickness,
+            this.cellSize - thickness
+          );
         });
       }
     });
