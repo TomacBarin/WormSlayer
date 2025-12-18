@@ -436,6 +436,7 @@ export default class Game {
         }
       }
     } else if (data.type === "state") {
+      // Synka worms
       this.worms = data.worms.map(w => {
         const worm = new Worm(colors[w.playerIndex], null, null, w.playerIndex);
         worm.segments = w.segments;
@@ -445,17 +446,31 @@ export default class Game {
         worm.shootTimer = w.shootTimer;
         return worm;
       });
-      if (!this.food && data.food) {
-        this.food = new Food(this.cols, this.rows);
+
+      // Synka vanlig mat (food)
+      if (data.food) {
+        if (!this.food) this.food = new Food(this.cols, this.rows);
+        this.food.pos = data.food;
+      } else {
+        this.food = null;
       }
-      if (this.food && data.food) this.food.pos = data.food;
-      if (!this.powerup && data.powerup) {
-        this.powerup = new Powerup(this.cols, this.rows);
+
+      // *** FIX: Synka powerup korrekt – detta löser problemet ***
+      if (data.powerup !== undefined) {
+        if (data.powerup) {
+          if (!this.powerup) this.powerup = new Powerup(this.cols, this.rows);
+          this.powerup.pos = data.powerup;
+        } else {
+          this.powerup = null; // Orange rutan försvinner nu hos ALLA spelare
+        }
       }
-      if (this.powerup && data.powerup) this.powerup.pos = data.powerup;
-      this.obstacles = data.obstacles;
+
+      // Synka hinder och timer
+      this.obstacles = data.obstacles || [];
       this.timeLeft = data.timeLeft;
-      this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, "0")}`;
+
+      // Uppdatera timer och poäng på skärmen
+      this.timerEl.textContent = `Time: ${String(this.timeLeft).padStart(3, "0")}`;
       this.updateScores();
     }
   }
