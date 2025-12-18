@@ -344,13 +344,18 @@ export default class Game {
         worm.grow();
         this.obstacles.push({ ...this.food.pos });
         this.food.newPos([...allSegments, ...this.obstacles]);
-        new Audio(this.fxEatFood).play();
+        new Audio(this.fxEatFood).play().catch(() => {});
       } else if (collision === "powerup") {
         worm.tongueShots += 1;
-        this.powerup = null;                    // Ta bort powerupen
-        this.powerupTimer = 0;                  // Starta om 10s-timer direkt
-        new Audio(this.fxPowerUp).play();
+        this.powerup = null;
+        this.powerupTimer = 0;
+        new Audio(this.fxPowerUp).play().catch(() => {});
       } else if (collision || otherCollision) {
+        // *** NYTT: Spela miss-ljud vid death + skicka till MP-klienter ***
+        new Audio(this.fxMiss).play().catch(() => {});
+        if (this.isMultiplayer && this.isHost) {
+          this.api.transmit({ type: "playMiss" });
+        }
         worm.reset(null, null, this.cols, this.rows, [...allSegments, ...this.obstacles]);
       }
 
@@ -359,8 +364,14 @@ export default class Game {
         tonguePos.forEach(pos => {
           this.worms.forEach((otherWorm, otherIndex) => {
             if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
+              // *** NYTT: Spela miss-ljud även vid tongue-kill + skicka till MP ***
+              new Audio(this.fxMiss).play().catch(() => {});
+              if (this.isMultiplayer && this.isHost) {
+                this.api.transmit({ type: "playMiss" });
+              }
               otherWorm.reset(null, null, this.cols, this.rows, [...allSegments, ...this.obstacles]);
-              new Audio(this.fxNewPower).play();
+              // Behåll det gamla tongue-kill-ljudet om du vill (dubbla ljud ok)
+              new Audio(this.fxNewPower).play().catch(() => {});
             }
           });
           const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
@@ -397,11 +408,11 @@ export default class Game {
     });
   }
 
-  processMessage(data, clientId) {
+    processMessage(data, clientId) {
     if (data.type === "request_assign" && this.isHost) {
       const nextIndex = this.connectedPlayers.length;
       if (nextIndex < 4) {
-        this.connectedPlayers.push({clientId, playerIndex: nextIndex});
+        this.connectedPlayers.push({ clientId, playerIndex: nextIndex });
         this.api.transmit({
           type: "assign",
           playerIndex: nextIndex,
@@ -435,6 +446,9 @@ export default class Game {
           worm.shootTongue();
         }
       }
+    } else if (data.type === "playMiss") {
+      // Spela miss-ljud på alla joinade spelare när någon dör
+      new Audio(this.fxMiss).play().catch(() => {});
     } else if (data.type === "state") {
       // Synka worms
       this.worms = data.worms.map(w => {
@@ -455,13 +469,13 @@ export default class Game {
         this.food = null;
       }
 
-      // *** FIX: Synka powerup korrekt – detta löser problemet ***
+      // Synka powerup korrekt (fix för att orange rutan försvinner hos alla)
       if (data.powerup !== undefined) {
         if (data.powerup) {
           if (!this.powerup) this.powerup = new Powerup(this.cols, this.rows);
           this.powerup.pos = data.powerup;
         } else {
-          this.powerup = null; // Orange rutan försvinner nu hos ALLA spelare
+          this.powerup = null;
         }
       }
 
