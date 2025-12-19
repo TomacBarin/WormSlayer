@@ -210,7 +210,7 @@ export default class Game {
     // Countdown om det finns
     if (this.lobbyCountdown > 0) {
       this.ctx.font = "16px Silkscreen, sans-serif";
-      this.ctx.fillStyle = "#FF2B6F";
+      this.ctx.fillStyle = "#F39420";
       this.ctx.fillText(
         `Game starts in ${this.lobbyCountdown} seconds...`,
         this.canvas.width / 2,

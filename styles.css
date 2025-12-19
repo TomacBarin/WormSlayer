@@ -102,7 +102,7 @@ h1 {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: var(--able-fuchsia-tom);
+    background-color: var(--able-orange);
     height: var(--spacing-4);
     width: var(--spacing-4);
     font-family: "VT323", monospace;
