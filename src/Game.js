@@ -155,7 +155,7 @@ export default class Game {
     this.ctx.stroke();
 
     // Centrerad spelare-lista
-    const startY = this.canvas.height / 2 - 80; // Startpunkt för första raden
+    const startY = this.canvas.height / 2 - 90; // Startpunkt för första raden
     const rowHeight = 60;
     const boxSize = this.cellSize / 1.5; // Mindre än full cell – som en ormsvans (ca 16px istället för 24px)
     const boxPadding = 20; // Avstånd från ruta till text
