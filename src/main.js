@@ -228,7 +228,7 @@ async function startMultiplayer(isHost) {
     popup.innerHTML = `
       <div style="background: #484848; padding: 48px; max-width: 80%; max-height: 80%; overflow: auto; border: 4px solid #646464;">
         <h1 style="font-size: 64px; text-align: center; margin-bottom: 32px;">Join Game</h1>
-        <input id="sessionInput" type="text" placeholder="Ange Session ID..." 
+        <input id="sessionInput" type="text" placeholder="Enter Session ID..." 
                style="font-family: VT323; font-size: 32px; padding: 16px; background: #646464; color: #EEEEEE; border: 2px solid #19E9FF; width: 80%; margin-bottom: 32px;">
         <button id="joinButton" style="padding: 16px 32px; font-size: 32px; background: #F39420; border: none; cursor: pointer; margin-right: 16px;">Join</button>
         <button id="cancelButton" style="padding: 16px 32px; font-size: 32px; background: #646464; border: none; cursor: pointer;">Cancel</button>
