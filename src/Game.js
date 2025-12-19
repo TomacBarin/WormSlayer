@@ -739,7 +739,7 @@ export default class Game {
         <div style="font-size: 48px; margin-bottom: 32px; color: ${finalScores.find((s) => s.score === maxScore)?.color || "#19E9FF"};">
           WINNER: Player ${finalScores.findIndex((s) => s.score === maxScore) + 1} (${maxScore} pts)
         </div>
-        <input id="winnerName" type="text" placeholder="Ditt namn för highscore..." 
+        <input id="winnerName" type="text" placeholder="Enter your name..." 
                style="font-family: VT323; font-size: 32px; padding: 16px; background: #646464; color: #EEEEEE; border: 2px solid #19E9FF; width: 80%; margin-bottom: 32px;">
         <button id="saveScore" style="padding: 16px 32px; font-size: 32px; background: #F39420; border: none; cursor: pointer; margin-right: 16px;">Save</button>
         <button id="closeNoSave" style="padding: 16px 32px; font-size: 32px; background: #646464; border: none; cursor: pointer;">Close</button>

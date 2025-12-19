@@ -1,34 +1,34 @@
 # Square Crawler: The Game
 
-![Screenshot from spelet](/assets/images/screenCrawlGame.webp)
+![Screenshot from the game](/assets/images/screenCrawlGame.webp)
 
-Ett enkelt Snakespel med power-ups och ett ökande antal hål som spelaren måste undvika, samt multiplayer-funktion.
-Byggt i JavaScript med Canvas.
+A simple Snake game with power-ups and an increasing number of holes that the player must avoid, plus multiplayer support.
+Built in JavaScript using Canvas.
 
 ## Installation
 
-1. Klona repot: `git clone https://github.com/TomacBarin/WormSlayer.git`
-2. Öppna `index.html` i en webbläsare (använd en lokal server som VS Code Live Server för att undvika CORS-problem med ljud/fonter).
+1. Clone the repo: `git clone https://github.com/TomacBarin/WormSlayer.git`
+2. Open `index.html` in a web browser (use a local server like VS Code Live Server to avoid CORS issues with audio/fonts).
 
-## Hur man spelar
+## How to Play
 
-**Starta spel**: Enter för lokalt spel, H för host multiplayer, J för join (ange session ID).
+**Start the game**: Enter for single player, H to host multiplayer, J to join (enter session ID).
 
-**Kontroller**:
+**Controls**:
 
-Samtliga ormar kontrolleras med piltangerna, både i Local Play samt Multiplayer.
-När en PowerUp har ätits (orange ruta) aktiveras tungan med space. Tungan är aktiv i cirka fyra sekunder, och kan både laga hål på spelplanen, samt döda fiender.
+All worms are controlled with the arrow keys, both in Single Player and Multiplayer.
+When a PowerUp has been eaten (orange square), the tongue is activated with space. The tongue stays active for about four seconds and can both repair holes on the board and kill enemies.
 
-**Regler**:
+**Rules**:
 
-- Vit mat: Skapar tillväxt + poäng, men lämnar dödliga hål.
-- Orange mat: Ger powerup (tunga).
-- Powerup: Tungan dödar fiender och reparerar hål. Aktivera med mellanslag.
-- Krock med vägg, egen kropp, hål eller annan mask: Återställning.
-- Flest poäng när timern tar slut vinner.
+- White food: Causes growth + points, but leaves deadly holes.
+- Orange food: Grants powerup (tongue).
+- Powerup: The tongue kills enemies and repairs holes. Activate with spacebar.
+- Collision with wall, own body, hole, or another worm: Reset.
+- Most points when the timer runs out wins.
 
-**?-knappen**: Klicka för spelregler.
+**?-button**: Click for game rules.
 
-## Musik och ljudeffekter
+## Music and Sound Effects
 
-Ljudeffekterna samt den Mycket Vackra Musiken har gjorts utav mig.
+The sound effects and the Very Beautiful Music were made by me.

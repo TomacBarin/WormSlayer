@@ -124,17 +124,17 @@ infoBtn.addEventListener("click", () => {
   `;
   popup.innerHTML = `
     <div style="background: #484848; padding: 48px; max-width: 80%; max-height: 80%; overflow: auto; border: 4px solid #646464;">
-      <h1 style="font-size: 64px; text-align: center; margin-bottom: 32px;">REGLER</h1>
+      <h1 style="font-size: 64px; text-align: center; margin-bottom: 32px;">RULES</h1>
       <p style="font-size: 28px; line-height: 1.4;">
-        • Styr med piltanger, använd space for PowerUp.<br>
-        • Vit mat → växt + poäng + skapar hål.<br>
-        • Orange mat → PowerUp.<br>
-        • PowerUp → Ormens tunga sträcks ut i fyra sekunder.<br>
-        • Ormens tunga kan döda fiender och laga hål.<br>
-        • Krock med vägg/kropp/hål/mask → reset.<br>
-        • Flest poäng när timern tagit slut vinner.
+        • Control with arrow keys, use space for PowerUp.<br>
+        • White food → growth + points + creates holes.<br>
+        • Orange food → PowerUp.<br>
+        • PowerUp → The worm's tongue extends for 4 seconds.<br>
+        • The worm's tongue can kill enemies and repair holes.<br>
+        • Collision with wall/body/hole/worm → reset.<br>
+        • The player with the most points when the timer runs out wins.
       </p>
-      <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #F39420; border: none; cursor: pointer;">Stäng</button>
+      <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #F39420; border: none; cursor: pointer;">Close</button>
     </div>
   `;
   document.body.appendChild(popup);
