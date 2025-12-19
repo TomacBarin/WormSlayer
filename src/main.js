@@ -134,7 +134,7 @@ infoBtn.addEventListener("click", () => {
         • Krock med vägg/kropp/hål/mask → reset.<br>
         • Flest poäng när timern tagit slut vinner.
       </p>
-      <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #EEEEEE; border: none; cursor: pointer;">Stäng</button>
+      <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 32px; padding: 16px; font-size: 32px; background: #F39420; border: none; cursor: pointer;">Stäng</button>
     </div>
   `;
   document.body.appendChild(popup);

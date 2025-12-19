@@ -131,7 +131,7 @@ export default class Game {
 
     this.ctx.font = "24px Silkscreen, sans-serif";
     this.ctx.fillStyle = "#2D2D2D";
-    this.ctx.fillText("Enter: Local Play", this.canvas.width / 2, this.canvas.height / 2 + 150);
+    this.ctx.fillText("Enter: Single Player", this.canvas.width / 2, this.canvas.height / 2 + 150);
     this.ctx.fillText("H: Host | J: Join", this.canvas.width / 2, this.canvas.height / 2 + 180);
     // this.ctx.fillText("J: Join Multiplayer", this.canvas.width / 2, this.canvas.height / 2 + 240);
   }
