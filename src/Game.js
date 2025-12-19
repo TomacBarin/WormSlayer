@@ -346,83 +346,149 @@ export default class Game {
   }
 
   updateGame() {
+    // Uppdatera tungor
     this.worms.forEach(worm => worm.updateShoot());
 
-    const allSegments = this.worms.flatMap(w => w.segments);
-
-    // NY: Powerup spawn timer – ca 10 sekunder (75 ticks vid 120ms/frame ≈ 9 sek, nära nog)
+    // Powerup-spawn (före moves)
     this.powerupTimer++;
     if (this.powerupTimer >= 75 && this.powerup === null) {
-      const occupied = [...allSegments, ...this.obstacles];
+      const occupied = [...this.worms.flatMap(w => w.segments), ...this.obstacles];
       if (this.food) occupied.push(this.food.pos);
       this.powerup = new Powerup(this.cols, this.rows, occupied);
       this.powerupTimer = 0;
       new Audio(this.fxNewPower).play().catch(() => {});
     }
 
-    this.worms.forEach((worm, index) => {
-      worm.move(this.cols, this.rows);
-      const head = worm.segments[0];
-      const collision = worm.checkCollision(
-        head,
-        this.cols,
-        this.rows,
-        worm.segments,
-        this.food ? this.food.pos : null,
-        this.powerup ? this.powerup.pos : null,
-        this.obstacles
-      );
+    // *** FAIR SIMULTANEOUS COLLISION DETECTION ***
+    const oldSegments = this.worms.map(w => w.segments.map(s => ({ ...s }))); // Kopiera gamla positioner
+    const newHeads = [];
+    for (let i = 0; i < this.worms.length; i++) {
+      const head = { ...this.worms[i].segments[0] };
+      switch (this.worms[i].direction) {
+        case 'up': head.y--; break;
+        case 'down': head.y++; break;
+        case 'left': head.x--; break;
+        case 'right': head.x++; break;
+      }
+      newHeads.push(head);
+    }
 
-      let otherCollision = false;
-      this.worms.forEach((other, oi) => {
-        if (oi !== index && other.segments.some(seg => seg.x === head.x && seg.y === head.y)) {
-          otherCollision = true;
+    const allOldSegments = oldSegments.flat();
+    let eaterIndex = -1;
+    let powerupEaterIndex = -1;
+    const deaths = new Set();
+
+    // Kolla kollisioner för varje orm (simultan!)
+    for (let i = 0; i < this.worms.length; i++) {
+      const newHead = newHeads[i];
+      const isFood = this.food && this.food.pos.x === newHead.x && this.food.pos.y === newHead.y;
+      const isPowerup = this.powerup && this.powerup.pos.x === newHead.x && this.powerup.pos.y === newHead.y;
+
+      // Wall
+      if (newHead.x < 0 || newHead.x >= this.cols || newHead.y < 0 || newHead.y >= this.rows) {
+        deaths.add(i);
+        continue;
+      }
+
+      // Eat food/powerup (räddar från kollision)
+      if (isFood) {
+        if (eaterIndex === -1) eaterIndex = i;
+      } else if (isPowerup) {
+        if (powerupEaterIndex === -1) powerupEaterIndex = i;
+      } else {
+        // Self body (exkl. eget gamla huvud)
+        if (oldSegments[i].slice(1).some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+          deaths.add(i);
+          continue;
         }
-      });
 
-      if (collision === "food") {
-        worm.grow();
-        this.obstacles.push({ ...this.food.pos });
-        this.food.newPos([...allSegments, ...this.obstacles]);
-        new Audio(this.fxEatFood).play().catch(() => {});
-      } else if (collision === "powerup") {
-        worm.tongueShots += 1;
-        this.powerup = null;
-        this.powerupTimer = 0;
-        new Audio(this.fxPowerUp).play().catch(() => {});
-      } else if (collision || otherCollision) {
-        // *** NYTT: Spela miss-ljud vid death + skicka till MP-klienter ***
+        // Other old bodies/heads eller obstacles
+        let bodyCollision = false;
+        for (let j = 0; j < this.worms.length; j++) {
+          if (j !== i && oldSegments[j].some(seg => seg.x === newHead.x && seg.y === newHead.y)) {
+            bodyCollision = true;
+            break;
+          }
+        }
+        if (bodyCollision || this.obstacles.some(obs => obs.x === newHead.x && obs.y === newHead.y)) {
+          deaths.add(i);
+          continue;
+        }
+
+        // Head-head (nya huvuden krockar)
+        for (let j = 0; j < this.worms.length; j++) {
+          if (j !== i && newHeads[j].x === newHead.x && newHeads[j].y === newHead.y) {
+            deaths.add(i);
+            deaths.add(j);  // Båda dör!
+            break;
+          }
+        }
+      }
+    }
+
+    // Hantera eats
+    if (eaterIndex !== -1) {
+      new Audio(this.fxEatFood).play().catch(() => {});
+      this.obstacles.push({ ...this.food.pos });
+      this.food.newPos([...allOldSegments, ...this.obstacles]);
+    }
+    if (powerupEaterIndex !== -1) {
+      this.worms[powerupEaterIndex].tongueShots += 1;
+      this.powerup = null;
+      this.powerupTimer = 0;
+      new Audio(this.fxPowerUp).play().catch(() => {});
+    }
+
+    // Applicera moves/resets
+    const resetOccupied = [...allOldSegments, ...this.obstacles];
+    if (this.food) resetOccupied.push(this.food.pos);
+    if (this.powerup) resetOccupied.push(this.powerup.pos);
+    for (let i = 0; i < this.worms.length; i++) {
+      const worm = this.worms[i];
+      if (deaths.has(i)) {
         new Audio(this.fxMiss).play().catch(() => {});
         if (this.isMultiplayer && this.isHost) {
           this.api.transmit({ type: "playMiss" });
         }
-        worm.reset(null, null, this.cols, this.rows, [...allSegments, ...this.obstacles]);
+        worm.reset(null, null, this.cols, this.rows, resetOccupied);
+      } else {
+        // Vanlig move (grow vid eat)
+        if (i === eaterIndex) {
+          const oldTail = { ...worm.segments[worm.segments.length - 1] };
+          worm.move(this.cols, this.rows);
+          worm.segments.push(oldTail);  // Grow: behåll svans!
+        } else {
+          worm.move(this.cols, this.rows);
+        }
       }
+    }
 
-      if (worm.isShooting) {
-        const tonguePos = worm.getTonguePositions(this.cols, this.rows);
-        tonguePos.forEach(pos => {
-          this.worms.forEach((otherWorm, otherIndex) => {
-            if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
-              // *** NYTT: Spela miss-ljud även vid tongue-kill + skicka till MP ***
-              new Audio(this.fxMiss).play().catch(() => {});
-              if (this.isMultiplayer && this.isHost) {
-                this.api.transmit({ type: "playMiss" });
-              }
-              otherWorm.reset(null, null, this.cols, this.rows, [...allSegments, ...this.obstacles]);
-              // Behåll det gamla tongue-kill-ljudet om du vill (dubbla ljud ok)
-              new Audio(this.fxNewPower).play().catch(() => {});
+    // Tongues (efter moves – fair!)
+    this.worms.forEach((worm, index) => {
+      if (!worm.isShooting) return;
+      const tonguePos = worm.getTonguePositions(this.cols, this.rows);
+      tonguePos.forEach(pos => {
+        // Döda andra
+        this.worms.forEach((otherWorm, otherIndex) => {
+          if (otherIndex !== index && otherWorm.segments.some(seg => seg.x === pos.x && seg.y === pos.y)) {
+            const currentResetOccupied = [...this.worms.flatMap(w => w.segments), ...this.obstacles];
+            new Audio(this.fxMiss).play().catch(() => {});
+            if (this.isMultiplayer && this.isHost) {
+              this.api.transmit({ type: "playMiss" });
             }
-          });
-          const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
-          if (obsIndex !== -1) this.obstacles.splice(obsIndex, 1);
+            otherWorm.reset(null, null, this.cols, this.rows, currentResetOccupied);
+            new Audio(this.fxNewPower).play().catch(() => {});
+          }
         });
-      }
+        // Laga hål
+        const obsIndex = this.obstacles.findIndex(obs => obs.x === pos.x && obs.y === pos.y);
+        if (obsIndex !== -1) this.obstacles.splice(obsIndex, 1);
+      });
     });
 
     this.updateScores();
     this.timeLeft--;
-    this.timerEl.textContent = `Time: ${this.timeLeft.toString().padStart(3, "0")}`;
+    this.timerEl.textContent = `Time: ${String(this.timeLeft).padStart(3, "0")}`;
     if (this.timeLeft <= 0) this.gameOver();
 
     if (this.isMultiplayer && this.isHost) {
