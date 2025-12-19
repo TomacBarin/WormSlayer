@@ -125,66 +125,106 @@ export default class Game {
     this.ctx.strokeStyle = "#2D2D2D";
     this.ctx.lineWidth = 2;
     this.ctx.beginPath();
-    this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 95);
-    this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 95);
+    this.ctx.moveTo(this.canvas.width / 2 - 200, this.canvas.height / 2 + 105);
+    this.ctx.lineTo(this.canvas.width / 2 + 200, this.canvas.height / 2 + 105);
     this.ctx.stroke();
 
-    this.ctx.font = "36px Silkscreen, sans-serif";
+    this.ctx.font = "24px Silkscreen, sans-serif";
     this.ctx.fillStyle = "#2D2D2D";
-    this.ctx.fillText("Enter: Local Play", this.canvas.width / 2, this.canvas.height / 2 + 140);
-    this.ctx.fillText("H: Host Multiplayer", this.canvas.width / 2, this.canvas.height / 2 + 190);
-    this.ctx.fillText("J: Join Multiplayer", this.canvas.width / 2, this.canvas.height / 2 + 240);
+    this.ctx.fillText("Enter: Local Play", this.canvas.width / 2, this.canvas.height / 2 + 150);
+    this.ctx.fillText("H: Host | J: Join", this.canvas.width / 2, this.canvas.height / 2 + 180);
+    // this.ctx.fillText("J: Join Multiplayer", this.canvas.width / 2, this.canvas.height / 2 + 240);
   }
 
   drawLobby() {
     this.ctx.fillStyle = this.introBgColor;
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+    // Titel: "LOBBY"
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
-    this.ctx.font = "192px VT323, monospace";
+    this.ctx.font = "128px VT323, monospace";
     this.ctx.fillStyle = "#2D2D2D";
-    this.ctx.fillText("LOBBY", this.canvas.width / 2, this.canvas.height / 2 - 200);
+    this.ctx.fillText("LOBBY", this.canvas.width / 2, this.canvas.height / 2 - 180); // Lite högre upp för mer plats
 
-    if (this.isHost && this.sessionId) {
-      this.ctx.font = "48px Silkscreen, sans-serif";
-      this.ctx.fillText(`Session ID: ${this.sessionId}`, this.canvas.width / 2, this.canvas.height / 2 - 140);
-    } else {
-      this.ctx.font = "48px Silkscreen, sans-serif";
-      this.ctx.fillText("Waiting for players...", this.canvas.width / 2, this.canvas.height / 2 - 140);
-    }
+     this.ctx.strokeStyle = "#2D2D2D";
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.canvas.width / 2 - 550, this.canvas.height / 2 - 105);
+    this.ctx.lineTo(this.canvas.width / 2 + 550, this.canvas.height / 2 - 105);
+    this.ctx.stroke();
 
-    const startY = this.canvas.height / 2 - 80;
+    // Centrerad spelare-lista
+    const startY = this.canvas.height / 2 - 80; // Startpunkt för första raden
+    const rowHeight = 60;
+    const boxSize = this.cellSize / 1.5; // Mindre än full cell – som en ormsvans (ca 16px istället för 24px)
+    const boxPadding = 20; // Avstånd från ruta till text
+
     for (let i = 0; i < 4; i++) {
       const player = this.connectedPlayers.find(p => p.playerIndex === i);
-      const color = colors[i];
+      const isYou = player && player.playerIndex === this.myPlayerIndex;
       const status = player ? "Connected" : "Waiting...";
-      const controls = i === 0 ? "Arrows" : i === 1 ? "WASD" : i === 2 ? "TFGH" : "IJKL";
+      const color = colors[i];
+      // const controls = i === 0 ? "Arrows" : i === 1 ? "WASD" : i === 2 ? "TFGH" : "IJKL"; // Kommenterat ut för nu
 
+      // Centrera hela raden: Beräkna x-position så att ruta + text hamnar i mitten
+      const text = `Player ${i + 1}${i === 0 ? " (Host)" : ""}${isYou ? " (you)" : ""}: ${status}`;
+      this.ctx.font = "24px VT323, monospace";
+      this.ctx.textAlign = "left"; // För att kunna mäta texten korrekt
+      const textWidth = this.ctx.measureText(text).width;
+      const totalWidth = boxSize + boxPadding + textWidth;
+      const rowX = (this.canvas.width - totalWidth) / 2; // Centrerad start-x
+
+      // Rita ruta
       this.ctx.fillStyle = color;
-      this.ctx.fillRect(this.canvas.width / 2 - 300, startY + i * 60, 40, 40);
+      this.ctx.fillRect(rowX, startY + i * rowHeight + 10, boxSize, boxSize); // Rutan centrerad vertikalt på texten
 
-      this.ctx.font = "36px VT323, monospace";
+      // Rita text
       this.ctx.fillStyle = "#2D2D2D";
       this.ctx.textAlign = "left";
       this.ctx.fillText(
-        `Player ${i + 1}${i === 0 ? " (Host)" : ""}: ${status} - Color: ${color} - Controls: ${controls}`,
-        this.canvas.width / 2 - 240,
-        startY + i * 60 + 20
+        text,
+        rowX + boxSize + boxPadding,
+        startY + i * rowHeight + 25 // 25px ner för att centreras vertikalt med rutan
       );
     }
 
-    const numConnected = this.connectedPlayers.length;
-    this.ctx.textAlign = "center";
-    this.ctx.font = "48px Silkscreen, sans-serif";
-    this.ctx.fillText(`${numConnected} players connected. Need 4 to start.`, this.canvas.width / 2, this.canvas.height / 2 + 200);
+         this.ctx.strokeStyle = "#2D2D2D";
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.canvas.width / 2 - 550, this.canvas.height / 2 + 155);
+    this.ctx.lineTo(this.canvas.width / 2 + 550, this.canvas.height / 2 + 155);
+    this.ctx.stroke();
 
+    // Nedre text: Antal spelare
+    this.ctx.textAlign = "center";
+    this.ctx.font = "16px Silkscreen, sans-serif";
+    this.ctx.fillStyle = "#2D2D2D";
+    const numConnected = this.connectedPlayers.length;
+    this.ctx.fillText(
+      `${numConnected} player${numConnected === 1 ? "" : "s"} connected. Need 4 to start.`,
+      this.canvas.width / 2,
+      this.canvas.height / 2 + 190
+    );
+
+    // Countdown om det finns
     if (this.lobbyCountdown > 0) {
-      this.ctx.font = "64px VT323, monospace";
-      this.ctx.fillText(`Game starts in ${this.lobbyCountdown} seconds...`, this.canvas.width / 2, this.canvas.height / 2 + 260);
+      this.ctx.font = "16px Silkscreen, sans-serif";
+      this.ctx.fillStyle = "#FF2B6F";
+      this.ctx.fillText(
+        `Game starts in ${this.lobbyCountdown} seconds...`,
+        this.canvas.width / 2,
+        this.canvas.height / 2 + 220
+      );
     }
 
-    this.drawLobbyBgFoods();
+    // Rita bakgrunds-mat (om du vill behålla)
+    // this.drawLobbyBgFoods();
+
+    // Kommenterade ut gamla delar – ta bort när du är nöjd
+    // if (this.isHost && this.sessionId) { ... }
+    // const controls = ... 
+    // this.ctx.fillText(`Player ${i + 1}${i === 0 ? " (Host)" : ""}: ${status}`, ...);
   }
 
   initLobbyBgFoods() {
