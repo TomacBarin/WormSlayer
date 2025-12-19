@@ -162,20 +162,61 @@ async function startMultiplayer(isHost) {
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject("Timeout: No response from server"), 15000)
     );
+
     Promise.race([hostPromise, timeoutPromise])
       .then(({ session, clientId }) => {
         game.sessionId = session;
         game.myClientId = clientId;
-        game.connectedPlayers.push({clientId: game.myClientId, playerIndex: 0});
+        game.connectedPlayers.push({ clientId: game.myClientId, playerIndex: 0 });
         game.lobbyState = true;
         game.initLobbyBgFoods();
         game.animate();
+
+        // *** NYTT: Visa popup med Session ID efter successful host ***
+        const popup = document.createElement("div");
+        popup.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+          background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; 
+          z-index: 1000; font-family: VT323; color: #EEEEEE; padding: 64px; box-sizing: border-box;
+        `;
+        popup.innerHTML = `
+          <div style="background: #484848; padding: 48px; max-width: 80%; max-height: 80%; overflow: auto; border: 4px solid #646464; text-align: center;">
+            <h1 style="font-size: 64px; text-align: center; margin-bottom: 32px;">SESSION ID</h1>
+            <div style="font-family: VT323; font-size: 48px; padding: 20px; background: #646464; color: #19E9FF; border: 2px solid #19E9FF; margin: 32px auto; width: 80%; word-break: break-all;">
+              ${session}
+            </div>
+            <button id="copyCloseButton" style="padding: 16px 32px; font-size: 32px; background: #F39420; border: none; cursor: pointer;">
+              Copy and Close
+            </button>
+          </div>
+        `;
+        document.body.appendChild(popup);
+
+        document.getElementById("copyCloseButton").onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(session);
+            // Valritt: lite feedback att det kopierades
+            const btn = document.getElementById("copyCloseButton");
+            const originalText = btn.textContent;
+            btn.textContent = "Copied!";
+            btn.style.background = "#19E9FF";
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.style.background = "#F39420";
+            }, 1000);
+          } catch (err) {
+            console.error("Failed to copy:", err);
+            alert("Failed to copy Session ID – copy manually: " + session);
+          }
+          document.body.removeChild(popup);
+        };
       })
       .catch((e) => {
         console.error("Host error:", e);
         alert("Failed to host: " + e);
       });
   } else {
+    // *** Oförändrad join-logik (popup för att skriva in ID) ***
     const assignPromise = new Promise((resolve) => (assignResolve = resolve));
 
     const popup = document.createElement("div");
@@ -201,6 +242,7 @@ async function startMultiplayer(isHost) {
 
     cancelButton.onclick = () => {
       document.body.removeChild(popup);
+      game.resetToTitle(); // Tillbaka till title screen om man avbryter
     };
 
     joinButton.onclick = async () => {
