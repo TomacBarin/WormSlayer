@@ -6,7 +6,7 @@ const canvas = document.getElementById("game-board");
 const game = new Game(canvas);
 // const api = new mpapi("wss://mpapi.se/net", "squarecrawler"); Detta är före byte av repo
 // const api = new mpapi('ws://localhost:8080/net', 'wormslayer'); // Lokal test
-const api = new mpapi('wss://mpapi.se/net', 'wormslayer');  // Extern server.
+const api = new mpapi("wss://mpapi.se/net", "wormslayer"); // Extern server.
 
 const keyMaps = [
   { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" },
@@ -21,22 +21,30 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (!game.isRunning && !game.gameOverActive && !game.lobbyState) {
-    if (e.key === "Enter") {
-      game.start(false);
-    } else if (e.key.toLowerCase() === "h") {
-      startMultiplayer(true);
-    } else if (e.key.toLowerCase() === "j") {
-      startMultiplayer(false);
+    try {
+      if (e.key === "Enter") {
+        game.start(false);
+      } else if (e.key.toLowerCase() === "h") {
+        startMultiplayer(true);
+      } else if (e.key.toLowerCase() === "j") {
+        startMultiplayer(false);
+      }
+    } catch (e) {
+      alert(e.message);
     }
     return;
   }
   if (game.lobbyState) {
-    if (game.isHost && e.key.toLowerCase() === "s" && game.connectedPlayers.length >= 2) {
+    if (
+      game.isHost &&
+      e.key.toLowerCase() === "s" &&
+      game.connectedPlayers.length >= 2
+    ) {
       game.lobbyCountdown = 5;
       game.lobbyStartTime = Date.now() + 5000;
       game.api.transmit({
         type: "lobby_countdown",
-        startTime: game.lobbyStartTime
+        startTime: game.lobbyStartTime,
       });
     }
     return;
@@ -143,6 +151,12 @@ infoBtn.addEventListener("click", () => {
 });
 
 async function startMultiplayer(isHost) {
+  if (!api.connected) {
+    alert(
+      "Not connected to multiplayer server. Please check your internet connection and try again."
+    );
+    return;
+  }
   game.isMultiplayer = true;
   game.isHost = isHost;
   game.api = api;
@@ -169,7 +183,10 @@ async function startMultiplayer(isHost) {
       .then(({ session, clientId }) => {
         game.sessionId = session;
         game.myClientId = clientId;
-        game.connectedPlayers.push({ clientId: game.myClientId, playerIndex: 0 });
+        game.connectedPlayers.push({
+          clientId: game.myClientId,
+          playerIndex: 0,
+        });
         game.lobbyState = true;
         game.initLobbyBgFoods();
         game.animate();
