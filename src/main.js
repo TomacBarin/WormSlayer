@@ -16,6 +16,9 @@ const keyMaps = [
 ];
 
 document.addEventListener("keydown", (e) => {
+  // NY: Ignorera keydown i input-fält (fixar J i join-popup)
+  if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
   if (game.gameOverActive && e.key === "Enter") {
     game.resetToTitle();
     return;
