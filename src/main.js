@@ -5,7 +5,8 @@ import { mpapi } from "./mpapi.js";
 const canvas = document.getElementById("game-board");
 const game = new Game(canvas);
 // const api = new mpapi("wss://mpapi.se/net", "squarecrawler"); Detta är före byte av repo
-const api = new mpapi('ws://localhost:8080/net', 'wormslayer');
+// const api = new mpapi('ws://localhost:8080/net', 'wormslayer'); // Lokal test
+const api = new mpapi('wss://mpapi.se/net', 'wormslayer');  // Extern server.
 
 const keyMaps = [
   { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" },
@@ -138,6 +139,7 @@ infoBtn.addEventListener("click", () => {
     </div>
   `;
   document.body.appendChild(popup);
+  sessionInput.focus();
 });
 
 async function startMultiplayer(isHost) {
