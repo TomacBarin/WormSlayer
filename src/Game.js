@@ -61,20 +61,33 @@ export default class Game {
     this.fxMiss = "assets/music/FX_Miss.ogg";
   }
 
-  async loadMainMusic() {
+async loadMainMusic() {
+  try {
+    // Försök hämta filen
+    const response = await fetch("assets/music/SquareCrawlMainMusic.ogg");
+    if (!response.ok) {
+      throw new Error(`Fetch failed with status: ${response.status}`);
+    }
+
+    // Konvertera till arrayBuffer
+    const arrayBuffer = await response.arrayBuffer();
+
+    // Dekodera audio data
+    this.mainMusicBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    console.log("Main music loaded successfully using AudioContext.");
+  } catch (error) {
+    console.error("Error loading main music via fetch/AudioContext:", error);
+    // Fallback till enkel Audio-instans
     try {
-      const response = await fetch("assets/music/SquareCrawlMainMusic.ogg");
-      const arrayBuffer = await response.arrayBuffer();
-      this.mainMusicBuffer = await this.audioContext.decodeAudioData(
-        arrayBuffer
-      );
-    } catch (error) {
-      console.error("Error loading main music:", error);
       this.mainMusic = new Audio("assets/music/SquareCrawlMainMusic.ogg");
       this.mainMusic.loop = true;
+      console.log("Fallback to HTML5 Audio succeeded.");
+    } catch (fallbackError) {
+      console.error("Fallback to HTML5 Audio also failed:", fallbackError);
+      // Här kan du lägga till ytterligare hantering, t.ex. en alert eller tyst misslyckande
     }
   }
-
+}
   playMainMusic() {
     if (this.mainMusicBuffer) {
       this.mainMusicSource = this.audioContext.createBufferSource();
